@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"errors"
 	"encoding/json"
 
 	"github.com/inconshreveable/log15"
@@ -24,6 +25,7 @@ import (
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 	"lineblocs.com/processor/logger"
+	"lineblocs.com/processor/mngrs"
 )
 
 var ariApp = "lineblocs"
@@ -56,6 +58,10 @@ func sendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     defer resp.Body.Close()
 
 	var headers http.Header
+
+
+
+
     fmt.Println("response Status:", resp.Status)
     fmt.Println("response Headers:", resp.Header)
 
@@ -64,9 +70,15 @@ func sendHttpRequest(path string, payload []byte) (*APIResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	bodyAsString := string(body)
     fmt.Println("response Body:", bodyAsString)
+    fmt.Println("response Status:", resp.Status)
 
+status := resp.StatusCode
+	if !(status >= 200 && status <= 299) {
+		return nil, errors.New("Status: " + resp.Status + " result: " + bodyAsString)
+	}
 
 	return &APIResponse{  
 		Headers: headers,
@@ -88,15 +100,17 @@ func sendPutRequest(path string, payload []byte) (string, error) {
 		return "", err
     }
     defer resp.Body.Close()
-
-    fmt.Println("response Status:", resp.Status)
-    fmt.Println("response Headers:", resp.Header)
     body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
 	bodyAsString := string(body)
     fmt.Println("response Body:", bodyAsString)
+    fmt.Println("response Status:", resp.Status)
+status := resp.StatusCode
+	if !(status >= 200 && status <= 299) {
+		return "", errors.New("Status: " + resp.Status + " result: " + bodyAsString)
+	}
 	return bodyAsString, nil
 
 }
@@ -118,17 +132,19 @@ func sendGetRequest(path string, vals map[string] string) (string, error) {
 		return "", err
     }
     defer resp.Body.Close()
-
-    fmt.Println("response Status:", resp.Status)
-    fmt.Println("response Headers:", resp.Header)
     body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
 	bodyAsString := string(body)
-    fmt.Println("response Body:", bodyAsString)
-	return bodyAsString, nil
 
+    fmt.Println("response Body:", bodyAsString)
+    fmt.Println("response Status:", resp.Status)
+	status := resp.StatusCode
+	if !(status >= 200 && status <= 299) {
+		return "", errors.New("Status: " + resp.Status + " result: " + bodyAsString)
+	}
+	return bodyAsString, nil
 }
 
 func createARIConnection(connectCtx context.Context) (ari.Client, error) {
@@ -323,9 +339,42 @@ func manageBridge(ctx context.Context, h *ari.BridgeHandle, wg *sync.WaitGroup) 
 	}
 }
 
+type Instruction func( context *types.Context, flow *types.Flow)
 
+func startProcessingFlow( ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell, runner *types.Runner) {
+	log.Debug("processing cell type " + cell.Cell.Type)
+	if runner.Cancelled {
+		log.Debug("flow runner was cancelled - exiting")
+		return
+	}
+	log.Debug("source link count: " + strconv.Itoa( len( cell.SourceLinks )))
+	log.Debug("target link count: " + strconv.Itoa( len( cell.TargetLinks )))
+	lineCtx := types.NewContext(
+		ctx,
+		&log,
+		flow,
+		cell,
+		runner,
+		lineChannel)
+	// execute it
+	switch ; cell.Cell.Type {
+		case "devs.LaunchModel":
+			for _, link := range cell.SourceLinks {
+				go startProcessingFlow( ctx, flow, lineChannel, eventVars, link.Target, runner)
+			}
+		case "devs.SwitchModel":
+		case "devs.BridgeModel":
+			mngr := mngrs.NewBridgeManager(lineCtx, flow)
+			mngr.StartProcessing()
+		case "devs.DialModel":
+		default:
+	}
+}
 func processFlow( ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell) {
-	//logger.Debug("processing cell type " + lineCell.cell.type)
+	log.Debug("processing cell type " + cell.Cell.Type)
+	runner:=types.Runner{Cancelled: false}
+	flow.Runners = append( flow.Runners, &runner )
+	startProcessingFlow( ctx, flow, lineChannel, eventVars, cell, &runner)
 }
 func processIncomingCall( ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string ) {
 	go attachDTMFListeners( lineChannel, ctx )
@@ -364,6 +413,7 @@ func processIncomingCall( ctx context.Context, flow *types.Flow, lineChannel *ty
 		Started: time.Now(),
 		Params: params }
 
+		flow.RootCall = &call
 	log.Debug("answering call..")
 	lineChannel.Channel.Answer()
 	vars := make( map[string] string )
