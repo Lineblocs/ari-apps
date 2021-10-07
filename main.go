@@ -423,19 +423,22 @@ func startExecution(event *ari.StasisStart, ctx context.Context, cl ari.Client, 
 		return
 	}
 
+
+	lineChannel := types.LineChannel{
+		Channel: h }
 	user := types.User{
 		Workspace: types.Workspace{
 			Id: data.WorkspaceId },
 		Id: data.CreatorId }
 	flow := types.NewFlow(
 		&user,
-		&flowJson)
+		&flowJson,
+		&lineChannel)
 
-
-	lineChannel := types.LineChannel{
-		Channel: h }
 
 		log.Debug("processing action: " + action)
+
+
 
 	if action == "h" { // dont handle it
 		fmt.Println("Received h handler - not processing")
@@ -444,7 +447,7 @@ func startExecution(event *ari.StasisStart, ctx context.Context, cl ari.Client, 
 	} else if action == "INCOMING_CALL" {
 		callerId := event.Args[ 2 ]
 		fmt.Printf("Starting stasis with extension: %s, caller id: %s", exten, callerId)
-		go processIncomingCall( ctx, &flow, &lineChannel, exten, callerId )
+		go processIncomingCall( ctx, flow, &lineChannel, exten, callerId )
 	} else if action == "OUTGOING_PROXY_ENDPOINT" {
 
 	} else if action == "OUTGOING_PROXY" {
