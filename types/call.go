@@ -23,5 +23,5 @@ type Call struct {
 	Channel *LineChannel
 	Started time.Time
 	Ended time.Time
-	Params CallParams
+	Params *CallParams
 }

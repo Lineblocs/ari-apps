@@ -7,3 +7,12 @@ type Record struct {
 	Call *Call
 	IsBridge bool
 }
+
+func NewRecording(user *User, channel *LineChannel, isBridge bool) (*Record) {
+	record := Record{
+		Channel: channel,
+		User: user,
+		IsBridge: isBridge }
+
+	return &record
+}

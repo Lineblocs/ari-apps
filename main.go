@@ -191,7 +191,7 @@ func main() {
 			case e := <-sub.Events():
 				v := e.(*ari.StasisStart)
 				log.Info("Got stasis start", "channel", v.Channel.ID)
-				go startExecution(v, ctx, cl, cl.Channel().Get(v.Key(ari.ChannelKey, v.Channel.ID)))
+				go startExecution(cl, v, ctx, cl.Channel().Get(v.Key(ari.ChannelKey, v.Channel.ID)))
 			case <-ctx.Done():
 				return
 			case <-connectCtx.Done():
@@ -341,7 +341,7 @@ func manageBridge(ctx context.Context, h *ari.BridgeHandle, wg *sync.WaitGroup) 
 
 type Instruction func( context *types.Context, flow *types.Flow)
 
-func startProcessingFlow( ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell, runner *types.Runner) {
+func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell, runner *types.Runner) {
 	log.Debug("processing cell type " + cell.Cell.Type)
 	if runner.Cancelled {
 		log.Debug("flow runner was cancelled - exiting")
@@ -350,6 +350,7 @@ func startProcessingFlow( ctx context.Context, flow *types.Flow, lineChannel *ty
 	log.Debug("source link count: " + strconv.Itoa( len( cell.SourceLinks )))
 	log.Debug("target link count: " + strconv.Itoa( len( cell.TargetLinks )))
 	lineCtx := types.NewContext(
+		cl,
 		ctx,
 		&log,
 		flow,
@@ -360,7 +361,7 @@ func startProcessingFlow( ctx context.Context, flow *types.Flow, lineChannel *ty
 	switch ; cell.Cell.Type {
 		case "devs.LaunchModel":
 			for _, link := range cell.SourceLinks {
-				go startProcessingFlow( ctx, flow, lineChannel, eventVars, link.Target, runner)
+				go startProcessingFlow( cl, ctx, flow, lineChannel, eventVars, link.Target, runner)
 			}
 		case "devs.SwitchModel":
 		case "devs.BridgeModel":
@@ -370,13 +371,13 @@ func startProcessingFlow( ctx context.Context, flow *types.Flow, lineChannel *ty
 		default:
 	}
 }
-func processFlow( ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell) {
+func processFlow( cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell) {
 	log.Debug("processing cell type " + cell.Cell.Type)
 	runner:=types.Runner{Cancelled: false}
 	flow.Runners = append( flow.Runners, &runner )
-	startProcessingFlow( ctx, flow, lineChannel, eventVars, cell, &runner)
+	startProcessingFlow( cl, ctx, flow, lineChannel, eventVars, cell, &runner)
 }
-func processIncomingCall( ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string ) {
+func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string ) {
 	go attachDTMFListeners( lineChannel, ctx )
 	callChannel := make(chan *types.Call)
 	go attachChannelLifeCycleListeners( flow, lineChannel, ctx, callChannel )
@@ -411,13 +412,13 @@ func processIncomingCall( ctx context.Context, flow *types.Flow, lineChannel *ty
 		CallId: idAsInt,
 		Channel: lineChannel,
 		Started: time.Now(),
-		Params: params }
+		Params: &params }
 
 		flow.RootCall = &call
 	log.Debug("answering call..")
 	lineChannel.Channel.Answer()
 	vars := make( map[string] string )
-	go processFlow( ctx, flow, lineChannel, vars, flow.Cells[ 0 ])
+	go processFlow( cl, ctx, flow, lineChannel, vars, flow.Cells[ 0 ])
 	callChannel <-  &call
 	for {
 		select {
@@ -426,13 +427,22 @@ func processIncomingCall( ctx context.Context, flow *types.Flow, lineChannel *ty
 		}
 	}
 }
-func startExecution(event *ari.StasisStart, ctx context.Context, cl ari.Client, h *ari.ChannelHandle) {
+func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context,  h *ari.ChannelHandle) {
 	log.Info("running app", "channel", h.Key().ID)
 
 	action := event.Args[ 0 ]
 	exten := event.Args[ 1 ]
 	vals := make(map[string] string)
 	vals["number"] = exten
+
+	if action == "h" { // dont handle it
+		fmt.Println("Received h handler - not processing")
+		return
+	} else if action == "DID_DIAL" {
+		fmt.Println("Already dialed - not processing")
+		return
+	}
+
 	body, err := sendGetRequest("/user/getDIDNumberData", vals)
 
 	if err != nil {
@@ -483,21 +493,18 @@ func startExecution(event *ari.StasisStart, ctx context.Context, cl ari.Client, 
 	flow := types.NewFlow(
 		&user,
 		&flowJson,
-		&lineChannel)
+		&lineChannel, 
+		cl)
 
 
 		log.Debug("processing action: " + action)
 
 
 
-	if action == "h" { // dont handle it
-		fmt.Println("Received h handler - not processing")
-	} else if action == "DID_DIAL" {
-		fmt.Println("Already dialed - not processing")
-	} else if action == "INCOMING_CALL" {
+	if action == "INCOMING_CALL" {
 		callerId := event.Args[ 2 ]
 		fmt.Printf("Starting stasis with extension: %s, caller id: %s", exten, callerId)
-		go processIncomingCall( ctx, flow, &lineChannel, exten, callerId )
+		go processIncomingCall( cl, ctx, flow, &lineChannel, exten, callerId )
 	} else if action == "OUTGOING_PROXY_ENDPOINT" {
 
 	} else if action == "OUTGOING_PROXY" {

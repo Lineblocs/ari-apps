@@ -1,8 +1,9 @@
 package types
 import (
 	"fmt"
-	"encoding/json"
+	//"encoding/json"
 	"reflect"
+	"github.com/CyCoreSystems/ari/v5"
 )
 type Vertice struct {
 	X float64 `json:"x"`
@@ -39,9 +40,11 @@ type ModelData struct {
 	ValueStr string
 	ValueArr []string
 	ValueObj map[string] string
+	ValueBool bool
 	IsArray bool
 	IsObj bool
 	IsStr bool
+	IsBool bool
 }
 type Model struct {
 	Id string
@@ -50,7 +53,7 @@ type Model struct {
 
 type UnparsedModel struct {
 	Id string `json:"id"`
-	Data string `json:"data"`
+	Data map[string]interface{} `json:"data"`
 
 }
 type Graph struct {
@@ -95,30 +98,38 @@ func createCellData(cell *Cell, flow *Flow, channel *LineChannel) {
 	targetLinks := make( []*Link, 0 )
 	for _, item := range flow.Vars.Models {
 		if (item.Id == cell.Cell.Id) {
-			unparsedModel := item
-			var modelData map[string]string
-			json.Unmarshal([]byte(unparsedModel.Data), &modelData)
+			//unparsedModel := item
+			var modelData map[string]interface{}
+			modelData = item.Data
+			//json.Unmarshal([]byte(unparsedModel.Data), &modelData)
 
-			for key, value := range modelData {
-				var v interface{}
-				json.Unmarshal([]byte(value), &modelData)
-				fmt.Println(reflect.TypeOf(v), reflect.ValueOf(v))
+			for key, v := range modelData {
 				item := ModelData{}
-				switch v := v.(type) {
-					case []string:
+ 				typeOfValue := fmt.Sprintf("%s", reflect.TypeOf(v))
+
+				fmt.Printf("parsing type %s\r\n", typeOfValue)
+				switch ; typeOfValue {
+					case "[]string":
 						// it's an array
 
-						item.ValueArr = v
+						item.ValueArr = v.([]string)
+						//item.ValueArr = v
 						item.IsArray = true
 
-					case map[string]string:
+					case "map[string]string":
 						// it's an object
-						item.ValueObj = v
+						fmt.Println("converting obj")
+						item.ValueObj = v.(map[string]string)
+						//item.ValueObj = v
 						item.IsObj = true
-					default:
+					case "string":
 						// it's something else
-						item.ValueStr = unparsedModel.Data
+						item.ValueStr = v.(string)
 						item.IsStr = true
+					case "boolean":
+						// it's something else
+						item.ValueBool = v.(bool)
+						item.IsBool = true
 					}
 					model.Data[key] = item
 
@@ -165,7 +176,7 @@ func addCellToFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 	createCellData(cellInFlow, flow, channel)
 	return cellInFlow
 }
-func NewFlow(user *User, vars *FlowVars, channel *LineChannel) (*Flow) {
+func NewFlow(user *User, vars *FlowVars, channel *LineChannel, client ari.Client) (*Flow) {
 	flow := &Flow{User: user, Vars: vars, Runners: make([]*Runner, 0)}
 	fmt.Printf("number of cells %d\r\n", len(flow.Vars.Graph.Cells))
 	// create cells from flow.Vars
