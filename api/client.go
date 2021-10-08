@@ -4,9 +4,12 @@ import (
 	"errors"
 	"io/ioutil"
 	"fmt"
+	"time"
 	"net/http"
 	"net/url"
 	"encoding/json"
+	"lineblocs.com/processor/types"
+	"lineblocs.com/processor/utils"
 )
 
 type APIResponse struct {
@@ -15,6 +18,10 @@ type APIResponse struct {
 }
 type CallerIdResponse struct {
 	Valid bool `json:"valid"`
+}
+type DomainResponse struct {
+	Id int `json:"id"`
+	WorkspaceId int `json:"workspace_id"`
 }
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     url := "https://internals.lineblocs.com" + path
@@ -137,4 +144,40 @@ func VerifyCallerId( workspaceId string, callerId string) (bool, error) {
 		return false, err
 	}
 	return data.Valid, nil
+}
+
+
+func GetUserByDomain( domain string ) (*DomainResponse, error) {
+	params := make( map[string]string )
+	fmt.Println("looking up domain: " + domain)
+	params["domain"] = domain
+	res, err := SendGetRequest("/user/getUserByDomain", params)
+	if err != nil {
+		return nil, err
+	}
+	var data DomainResponse
+ 	err = json.Unmarshal( []byte(res), &data  )
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func UpdateCall( call *types.Call, status string ) (error) {
+	call.Ended = time.Now()
+	params := types.StatusParams{
+		CallId: call.CallId,
+		Ip: utils.GetPublicIp(),
+		Status: status  }
+	body, err := json.Marshal( params )
+
+	if err != nil {
+		return err
+	}
+
+	_, err = SendHttpRequest( "/call/updateCall", body)
+	if err != nil {
+		return err
+	}
+	return nil
 }

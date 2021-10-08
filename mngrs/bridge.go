@@ -130,15 +130,19 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, wg *sync.W
 		return
 	}
 
-	numberToCall := model.Data["number_to_call"].ValueStr
-
-
+	numberToCall := utils.DetermineNumberToCall( model.Data )
 	//key := src.New(ari.ChannelKey, rid.New(rid.Channel))
 
-	outboundChannel, err := ctx.Client.Channel().Create(nil, ari.ChannelCreateRequest{
-		Endpoint: "SIP/" + numberToCall + "@" + utils.GetSIPProxy(),
-		App:      "lineblocs",
-		AppArgs: "DID_DIAL," })
+	log.Debug("Calling: " + numberToCall)
+
+
+	/*
+	src := channel.Channel.Key()
+
+	key := src.New(ari.ChannelKey, rid.New(rid.Channel))
+	outboundChannel := ari.NewChannelHandle( key, ctx.Client.Channel(), nil )
+	*/
+	outboundChannel, err := ctx.Client.Channel().Create(nil, utils.CreateChannelRequest( numberToCall )	)
 
 	if err != nil {
 		log.Debug("error creating outbound channel: " + err.Error())
@@ -158,7 +162,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, wg *sync.W
 		return
 	}
 
-	log.Info("creating call...")
+	log.Info("creating outbound call...")
 	resp, err := api.SendHttpRequest( "/call/createCall", body )
 	outChannel := types.LineChannel{
 		Channel: outboundChannel }
@@ -169,13 +173,38 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, wg *sync.W
 		return
 	}
 
+	outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall) )
+	return
+
+	/*
+	startSub := outChannel.Channel.Subscribe(ari.Events.StasisStart)
+	defer startSub.Cancel()
+	destSub := outChannel.Channel.Subscribe(ari.Events.ChannelDestroyed)
+	defer destSub.Cancel()
+	endSub := outChannel.Channel.Subscribe(ari.Events.StasisEnd)
+	defer endSub.Cancel()
+
+	for {
+
+		select {
+			case <-startSub.Events():
+				log.Debug("call is setup")
+			case <-endSub.Events():
+				log.Debug("call ended..")
+			case <-destSub.Events():
+				log.Debug("call destroyed..")
+		}
+
+	}
+	*/
+
+
+
 	if err := bridge.Bridge.AddChannel(outChannel.Channel.Key().ID); err != nil {
 		log.Error("failed to add channel to bridge", "error", err)
 		return
 	}
 	log.Debug("added outbound channel to bridge..")
-
-
 }
 
 func NewBridgeManager(mngrCtx *types.Context, flow *types.Flow) (*BridgeManager) {

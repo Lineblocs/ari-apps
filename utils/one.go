@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 	"lineblocs.com/processor/types"
+	"github.com/CyCoreSystems/ari/v5"
 )
 // TODO get the ip
 func GetPublicIp( ) string {
@@ -54,7 +55,57 @@ func CreateCall( id string, channel *types.LineChannel, params *types.CallParams
 	return &call, nil
 }
 
+// TODO call API to get proxy IPs
 func GetSIPProxy() (string) {
 	//return "proxy1";
-	return "127.0.0.1"
+	return "52.60.126.237"
+}
+
+func CreateChannelRequest(numberToCall string) (ari.ChannelCreateRequest) {
+ 	return ari.ChannelCreateRequest{
+		Endpoint: "SIP/" + numberToCall + "@" + GetSIPProxy(),
+		App:      "lineblocs",
+		AppArgs: "DID_DIAL," }
+}
+
+func CreateChannelRequest2(numberToCall string) (ari.ChannelCreateRequest) {
+ 	return ari.ChannelCreateRequest{
+		Endpoint: "SIP/" + numberToCall + "/" + GetSIPProxy(),
+		App:      "lineblocs",
+		AppArgs: "DID_DIAL_2," }
+}
+
+
+
+func CreateOriginateRequest(callerId string, numberToCall string) (ari.OriginateRequest) {
+ 	return ari.OriginateRequest{
+		CallerID: callerId,
+		Endpoint: "SIP/" + numberToCall + "@" + GetSIPProxy(),
+		App: "lineblocs",
+		AppArgs: "DID_DIAL," }
+}
+
+func CreateOriginateRequest2(callerId string, numberToCall string) (ari.OriginateRequest) {
+ 	return ari.OriginateRequest{
+		CallerID: callerId,
+		Endpoint: "SIP/" + numberToCall + "/" + GetSIPProxy(),
+		App: "lineblocs",
+		AppArgs: "DID_DIAL_2," }
+}
+
+func DetermineNumberToCall(data map[string]types.ModelData) (string) {
+	callType := data["call_type"]
+
+	if callType.ValueStr == "Extension" {
+		return data["extension"].ValueStr
+	} else if callType.ValueStr == "Phone Number" {
+		return data["phone_number"].ValueStr
+	}
+	return ""
+}
+
+func SafeHangup(lineChannel *types.LineChannel) {
+	if lineChannel.Channel != nil {
+		lineChannel.Channel.Hangup()
+	}
 }
