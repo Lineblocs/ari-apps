@@ -173,7 +173,9 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, wg *sync.W
 		return
 	}
 
-	outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall) )
+	domain := user.Workspace.Domain
+	headers := utils.CreateSIPHeaders(domain, callerId, "extension")
+	outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 	return
 
 	/*

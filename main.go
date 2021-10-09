@@ -139,7 +139,7 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 }
 
 
-func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string	) (error) {
+func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string) (error) {
 	log.Debug("ensureBridge called..")
 	var bridge *ari.BridgeHandle 
 	var err error
@@ -219,7 +219,11 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 	}
 
 	log.Debug("Originating call...")
-	outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall) )
+
+
+	domain := user.Workspace.Domain
+	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall)
+	outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
@@ -465,6 +469,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 	vals := make(map[string] string)
 	vals["number"] = exten
 
+	log.Debug("received action: " + action)
 	if action == "h" { // dont handle it
 		fmt.Println("Received h handler - not processing")
 		return
@@ -518,12 +523,9 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 
 		lineChannel := types.LineChannel{
 			Channel: h }
-		user := types.User{
-			Workspace: types.Workspace{
-				Id: data.WorkspaceId },
-			Id: data.CreatorId }
+		user := types.NewUser(data.CreatorId, data.WorkspaceId, data.WorkspaceName)
 		flow := types.NewFlow(
-			&user,
+			user,
 			&flowJson,
 			&lineChannel, 
 			cl)
@@ -551,15 +553,31 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 			return
 		}
 		log.Debug("workspace ID= " + strconv.Itoa(resp.WorkspaceId))
-		user := types.User{
-			Workspace: types.Workspace{
-				Id: resp.WorkspaceId },
-			Id: resp.Id  }
+		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
-			ensureBridge( cl, lineChannel.Channel.Key(), &user, &lineChannel, callerId, exten)
+			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension")
 
 	} else if action == "OUTGOING_PROXY" {
+		callerId := event.Args[ 2 ]
+		domain := event.Args[ 3 ]
+
+
+		lineChannel := types.LineChannel{
+			Channel: h }
+
+			log.Debug("looking up domain: " + domain)
+		resp, err := api.GetUserByDomain( domain )
+
+		if err != nil {
+			log.Debug("could not get domain. error: " + err.Error())
+			return
+		}
+		log.Debug("workspace ID= " + strconv.Itoa(resp.WorkspaceId))
+		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
+
+		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
+			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn")
 
 	} else if action == "OUTGOING_PROXY_MEDIA" {
 

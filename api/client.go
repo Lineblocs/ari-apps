@@ -22,6 +22,7 @@ type CallerIdResponse struct {
 type DomainResponse struct {
 	Id int `json:"id"`
 	WorkspaceId int `json:"workspace_id"`
+	WorkspaceName string `json:"workspace_name"`
 }
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     url := "https://internals.lineblocs.com" + path

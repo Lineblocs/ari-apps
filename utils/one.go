@@ -77,12 +77,12 @@ func CreateChannelRequest2(numberToCall string) (ari.ChannelCreateRequest) {
 
 
 
-func CreateOriginateRequest(callerId string, numberToCall string) (ari.OriginateRequest) {
+func CreateOriginateRequest(callerId string, numberToCall string, headers map[string] string) (ari.OriginateRequest) {
  	return ari.OriginateRequest{
 		CallerID: callerId,
 		Endpoint: "SIP/" + numberToCall + "@" + GetSIPProxy(),
 		App: "lineblocs",
-		AppArgs: "DID_DIAL," }
+		AppArgs: "DID_DIAL,", Variables: headers }
 }
 
 func CreateOriginateRequest2(callerId string, numberToCall string) (ari.OriginateRequest) {
@@ -108,4 +108,20 @@ func SafeHangup(lineChannel *types.LineChannel) {
 	if lineChannel.Channel != nil {
 		lineChannel.Channel.Hangup()
 	}
+}
+
+
+
+func GetSIPSecretKey() string {
+	return "xxx-1"
+}
+
+
+func CreateSIPHeaders(domain string, callerId string, typeOfCall string) map[string]string {
+	headers := make( map[string]string )
+	headers["SIPADDHEADER0"] = "X-LineBlocs-Key: " + GetSIPSecretKey()
+	headers["SIPADDHEADER1"] = "X-LineBlocs-Domain: " + domain
+	headers["SIPADDHEADER3"] = "X-LineBlocs-Route-Type: " + typeOfCall
+	headers["SIPADDHEADER4"] ="X-LineBlocs-Caller: " + callerId
+	return headers
 }

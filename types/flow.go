@@ -67,6 +67,7 @@ type FlowVars struct {
 type FlowDIDData struct {
 	//FlowJson FlowVars `json:"flow_json"`
 	WorkspaceId int `json:"workspace_id"`
+	WorkspaceName string `json:"workspace_name"`
 	CreatorId int `json:"creator_id"`
 	FlowJson string `json:"flow_json"`
 	Plan string `json:"plan"`
