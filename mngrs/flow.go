@@ -17,9 +17,11 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 	}
 	log.Debug("source link count: " + strconv.Itoa( len( cell.SourceLinks )))
 	log.Debug("target link count: " + strconv.Itoa( len( cell.TargetLinks )))
+	manRecvChannel := make(chan types.Link)	
 	lineCtx := types.NewContext(
 		cl,
 		ctx,
+		manRecvChannel,
 		&log,
 		flow,
 		cell,
@@ -35,8 +37,27 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 		case "devs.BridgeModel":
 			mngr := NewBridgeManager(lineCtx, flow)
 			mngr.StartProcessing()
+		case "devs.PlaybackModel":
+			mngr := NewPlaybackManager(lineCtx, flow)
+			mngr.StartProcessing()
+		case "devs.ProcessInputModel":
+			mngr := NewInputManager(lineCtx, flow)
+			mngr.StartProcessing()
 		case "devs.DialModel":
 		default:
+	}
+	for {
+		select {
+			case next, ok := <-manRecvChannel:
+				if !ok {
+					log.Debug("error receiving result from cell..")
+					return
+				}
+				log.Debug("ended process for cell")
+				log.Debug("moving to next..")
+
+				startProcessingFlow( cl, ctx, flow, lineChannel, eventVars, next.Target, runner)
+		}
 	}
 }
 

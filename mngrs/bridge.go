@@ -4,6 +4,8 @@ import (
 	"sync"
 	"errors"
 	"strconv"
+	"context"
+	"time"
 	"encoding/json"
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/CyCoreSystems/ari/v5/rid"
@@ -33,12 +35,12 @@ func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) (error) {
 		return eris.Wrap(err, "failed to create bridge")
 	}
 
-	lineBridge := types.LineBridge{Bridge: bridge}
+	lineBridge := types.NewBridge(bridge)
 	log.Info("channel added to bridge")
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go man.manageBridge(&lineBridge, wg, callType)
+	go man.manageBridge(lineBridge, wg, callType)
 	wg.Wait()
 	if err := bridge.AddChannel(ctx.Channel.Channel.Key().ID); err != nil {
 		log.Error("failed to add channel to bridge", "error", err)
@@ -46,7 +48,7 @@ func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) (error) {
 	}
 
 	log.Info("channel added to bridge")
-	go man.startOutboundCall(&lineBridge, callType) 
+	go man.startOutboundCall(lineBridge, callType) 
 
 
 
@@ -55,8 +57,9 @@ func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) (error) {
 func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGroup, callType string) {
 	h := bridge.Bridge
 	ctx := man.ManagerContext
+	cell := ctx.Cell
 	log := ctx.Log
-
+	next, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Connected Call Ended")
 
 	log.Debug("manageBridge called..")
 	// Delete the bridge when we exit
@@ -94,11 +97,27 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 			}
 			v := e.(*ari.ChannelLeftBridge)
 			log.Debug("channel left bridge", "channel", v.Channel.Name)
+			man.endBridgeCall(bridge)
+			if next != nil {
+				man.ManagerContext.RecvChannel <- *next
+			}
 		}
 	}
 }
 
-func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup) (error) {
+func (man *BridgeManager) endBridgeCall( lineBridge *types.LineBridge ) {
+	ctx := man.ManagerContext
+	log := ctx.Log
+	log.Debug("ending ALL bridge calls..")
+	for _, item := range lineBridge.Channels {
+		log.Debug("ending call: " + item.Channel.Key().ID)
+		utils.SafeHangup( item )
+	}
+
+	// TODO:  billing
+
+}
+func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) (error) {
 	ctx := man.ManagerContext
 	lineChannel := ctx.Channel
 	log := ctx.Log
@@ -107,6 +126,9 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 	startSub := outboundChannel.Channel.Subscribe(ari.Events.StasisStart)
 
 	defer startSub.Cancel()
+	rootEndSub := lineChannel.Channel.Subscribe(ari.Events.StasisEnd)
+	defer rootEndSub.Cancel()
+
 	wg.Done()
 	log.Debug("listening for channel events...")
 
@@ -122,8 +144,11 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 				}
 				log.Debug("added outbound channel to bridge..")
 				lineChannel.Channel.StopRing()
+ 				ringTimeoutChan <- true
 			case <-endSub.Events():
 				log.Debug("ended call..")
+			case <-rootEndSub.Events():
+				log.Debug("root inded call..")
 
 		}
 	}
@@ -157,6 +182,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 
 	log.Debug("Calling: " + numberToCall)
 
+	timeout := utils.ParseRingTimeout( model.Data["timeout"].ValueStr )
 
 	/*
 	src := channel.Channel.Key()
@@ -211,11 +237,46 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 	}
 	outChannel.Channel = outboundChannel
 
+	stopChannel := make( chan bool )
 	channel.Channel.Ring()
+
+	wg1 := new(sync.WaitGroup)
+	wg1.Add(1)
+	utils.AddChannelToBridge( bridge, channel )
+	utils.AddChannelToBridge( bridge, &outChannel )
+ 	go man.manageOutboundCallLeg(&outChannel, bridge, wg1, stopChannel)
+
+	wg1.Wait()
+
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
- 	go man.manageOutboundCallLeg(&outChannel, bridge, wg2)
+	go man.startListeningForRingTimeout(timeout, bridge, wg2, stopChannel)
 	wg2.Wait()
+}
+
+func (man *BridgeManager) startListeningForRingTimeout(timeout int, bridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan <-chan bool) {
+	ctx := man.ManagerContext
+	log := ctx.Log
+	log.Debug("starting ring timeout checker..")
+	log.Debug("timeout set for: " + strconv.Itoa( timeout ))
+    duration := time.Now().Add(time.Duration( timeout ) * time.Second)
+
+    // Create a context that is both manually cancellable and will signal
+    // a cancel at the specified duration.
+    ringCtx, cancel := context.WithDeadline(context.Background(), duration)
+    defer cancel()
+	wg.Done()
+	for {
+    select {
+		case <-ringTimeoutChan:
+				log.Debug("bridge in session. stopping ring timeout")
+				return
+			case <-ringCtx.Done():
+				log.Debug("Ring timeout elapsed.. ending all calls")
+				man.endBridgeCall(bridge)
+				return
+    }
+}
 }
 
 func NewBridgeManager(mngrCtx *types.Context, flow *types.Flow) (*BridgeManager) {

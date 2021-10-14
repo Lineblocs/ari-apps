@@ -15,6 +15,7 @@ type CellConnection struct {
 }
 type GraphCell struct {
 	Id string `json:"id"`
+	Name string `json:"name"`
 	Type string `json:"type"`
 	Source CellConnection `json:"source"`
 	Target CellConnection `json:"target"`
@@ -33,6 +34,8 @@ type Cell struct {
 	CellChannel *LineChannel
 	SourceLinks []*Link
 	TargetLinks []*Link
+	EventVars map[string]string
+	AttachedCall *Call
 }
 
 type ModelData struct {
@@ -46,14 +49,25 @@ type ModelData struct {
 	IsStr bool
 	IsBool bool
 }
+
+type ModelLink struct {
+	Type string `json:"type"`
+	Condition string `json:"condition"`
+	Value string `json:"value"`
+	Cell string `json:"cell"`
+}
 type Model struct {
 	Id string
+	Name string
 	Data map[string] ModelData
+	Links []*ModelLink `json:"links"`
 }
 
 type UnparsedModel struct {
 	Id string `json:"id"`
+	Name string `json:"name"`
 	Data map[string]interface{} `json:"data"`
+	Links []*ModelLink `json:"links"`
 
 }
 type Graph struct {
@@ -83,7 +97,7 @@ func findCellInFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 	if cellToFind == nil {
 		// could not find
 	}
-	cell := Cell{ Channel: channel, Cell: cellToFind }
+	cell := Cell{ Channel: channel, Cell: cellToFind, EventVars: make( map[string]string ) }
 	if cellToFind.Type == "devs.DialModel" || cellToFind.Type == "devs.BridgeModel" || cellToFind.Type == "devs.ConferenceModel" {
 		// empty holder channel
 		cell.CellChannel = &LineChannel{}
@@ -94,7 +108,7 @@ func findCellInFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 func createCellData(cell *Cell, flow *Flow, channel *LineChannel) {
 	var model Model = Model{
 		Id: "",
-		Data: make(map[string] ModelData)}
+		Data: make(map[string] ModelData) }
 	sourceLinks := make( []*Link, 0 )
 	targetLinks := make( []*Link, 0 )
 	for _, item := range flow.Vars.Models {
@@ -102,6 +116,8 @@ func createCellData(cell *Cell, flow *Flow, channel *LineChannel) {
 			//unparsedModel := item
 			var modelData map[string]interface{}
 			modelData = item.Data
+			model.Name =  item.Name
+			model.Links =  item.Links
 			//json.Unmarshal([]byte(unparsedModel.Data), &modelData)
 
 			for key, v := range modelData {

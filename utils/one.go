@@ -56,6 +56,61 @@ func FindLinkByName( links []*types.Link, direction string, tag string) (*types.
 	}
 	return nil, errors.New("Could not find link")
 }
+func GetCellByName( flow *types.Flow, name string ) (*types.Cell, error) {
+	for _, v := range flow.Cells {
+
+		if v.Cell.Name == name {
+			return v, nil
+		}
+	}
+	return nil, nil
+}
+func LookupCellVariable( flow *types.Flow, name string, lookup string) (string, error) {
+	var cell *types.Cell
+	cell, err := GetCellByName( flow, name )
+	if err != nil {
+		return "", err
+	}
+	if cell == nil {
+		return "", errors.New("Could not find cell")
+	}
+	if cell.Cell.Type == "devs.LaunchModel" {
+		if lookup == "call.from" {
+			return cell.EventVars["callFrom"], nil
+		} else if lookup == "call.to" {
+			return cell.EventVars["callTo"], nil
+		} else if lookup == "channel.id" {
+			return cell.EventVars["channelId"], nil
+		}
+	} else if cell.Cell.Type == "devs.DialhModel" {
+		if lookup == "from" {
+			return cell.EventVars["from"], nil
+		} else if lookup == "call.to" {
+			return cell.EventVars["to"], nil
+		} else if lookup == "dial_status" {
+			return cell.EventVars["dial_status"], nil
+		} else if lookup == "channel.id" {
+			return cell.EventVars["channelId"], nil
+		}
+	} else if cell.Cell.Type == "devs.BridgehModel" {
+		if lookup == "from" {
+			return cell.EventVars["from"], nil
+		} else if lookup == "call.to" {
+			return cell.EventVars["to"], nil
+		} else if lookup == "dial_status" {
+			return cell.EventVars["dial_status"], nil
+		} else if lookup == "channel.id" {
+			return cell.EventVars["channelId"], nil
+		} else if lookup == "started" {
+			call := cell.AttachedCall
+			return strconv.Itoa( call.GetStartTime() ), nil
+		} else if lookup == "ended" {
+			call := cell.AttachedCall
+			return strconv.Itoa( call.FigureOutEndedTime() ), nil
+		}
+	}
+	return "", errors.New("Could not find link")
+}
 
 func CreateCall( id string, channel *types.LineChannel, params *types.CallParams) (*types.Call, error) {
 		idAsInt, err := strconv.Atoi(id)
@@ -151,6 +206,12 @@ func GetLogger() (log15.Logger) {
 	return log
 }
 
+func sendToAssetServer( path string ) (error, string) {
+
+
+	// send back link to media
+	return nil, ""
+}
 
 func DownloadFile(flow *types.Flow, url string) (string, error) {
 
@@ -189,9 +250,14 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	err, link  := sendToAssetServer( fullPathToFile )
+	if err != nil {
+		return "", err
+	}
 	
 
-	return path.Base( fullPathToFile ), err
+	return link, err
 }
 
 func StartTTS(flow *types.Flow, say string, gender string, voice string, lang string) (string, error) {
@@ -256,7 +322,13 @@ func StartTTS(flow *types.Flow, say string, gender string, voice string, lang st
 			return "", err
 	}
 	fmt.Printf("Audio content written to file: %v\n", filename)
-	return "", nil
+	err, link  := sendToAssetServer(  filename )
+	if err != nil {
+		return "", err
+	}
+
+
+	return link, nil
 }
 
 
@@ -274,5 +346,20 @@ func changeAudioEncoding(filepath string, ext string) (string, error) {
 		return "", err
 	}
 	return newfile, nil
+
+}
+
+func AddChannelToBridge( bridge *types.LineBridge, channel *types.LineChannel) {
+	bridge.Channels = append( bridge.Channels, channel )
+}
+
+func ParseRingTimeout( value string ) (int) {
+	result, err := strconv.Atoi( value )
+
+	// use default
+	if err != nil {
+		return 30
+	}
+	return result
 
 }

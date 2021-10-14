@@ -156,7 +156,8 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 		return eris.Wrap(err, "failed to create bridge")
 	}
 	outChannel := types.LineChannel{}
-	lineBridge := types.LineBridge{Bridge: bridge}
+	lineBridge := types.NewBridge(bridge)
+	
 	log.Info("channel added to bridge")
 
 
@@ -195,7 +196,7 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go manageBridge(&lineBridge, &call, lineChannel, &outChannel, wg)
+	go manageBridge(lineBridge, &call, lineChannel, &outChannel, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
 		log.Error("failed to add channel to bridge", "error", err)
@@ -240,7 +241,7 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 	lineChannel.Channel.Ring()
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
- 	go manageOutboundCallLeg(lineChannel, &outChannel, &lineBridge, wg2)
+ 	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, wg2)
 	wg2.Wait()
 
 	return nil

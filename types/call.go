@@ -25,3 +25,9 @@ type Call struct {
 	Ended time.Time
 	Params *CallParams
 }
+func (c *Call) GetStartTime() (int) {
+	return 0
+}
+func (c *Call)  FigureOutEndedTime() (int) {
+	return 0
+}

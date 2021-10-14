@@ -28,15 +28,9 @@ func (man *PlaybackManager) StartProcessing() {
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 
 	if playbackType == "Say" {
-		file, err := utils.DownloadFile( flow, data["url_audio"].ValueStr )
 
-		if err != nil {
-			log.Error("error downloading: " + err.Error())
-		}
-		man.beginPrompt(file)
 
-	} else if playbackType == "Play" {
-
+		log.Debug("processing TTS")
 		file, err := utils.StartTTS( flow, 
 			data["text_to_say"].ValueStr,
 			data["text_gender"].ValueStr,
@@ -47,6 +41,15 @@ func (man *PlaybackManager) StartProcessing() {
 			log.Error("error downloading: " + err.Error())
 		}
 
+		man.beginPrompt(file)
+	} else if playbackType == "Play" {
+
+		log.Debug("processing TTS")
+		file, err := utils.DownloadFile( flow, data["url_audio"].ValueStr )
+
+		if err != nil {
+			log.Error("error downloading: " + err.Error())
+		}
 		man.beginPrompt(file)
 
 	}
@@ -65,4 +68,15 @@ func (man *PlaybackManager) beginPrompt(prompt string) {
 	}
 	finishedSub := playback.Subscribe(ari.Events.PlaybackFinished)
 	defer finishedSub.Cancel()
+
+	for {
+		select {
+		case <-finishedSub.Events():
+			log.Debug("playback finished...")
+			return
+		default:
+			log.Debug("no response received..")
+			return
+		}
+	}
 }

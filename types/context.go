@@ -17,6 +17,7 @@ type Context struct {
  	Log log15.Logger
  	Context context.Context
 	 Client ari.Client
+	RecvChannel chan<- Link
 }
 
 func convertVariableValues(value string, lineFlow *Flow) (string) {
@@ -68,7 +69,7 @@ func processAllInterpolations( data map[string] ModelData, lineFlow *Flow) {
 		processInterpolation(&val, lineFlow)
 	}
 }
-func NewContext(cl ari.Client, ctx context.Context, log *log15.Logger, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) (*Context) {
+func NewContext(cl ari.Client, ctx context.Context, recvChannel chan<- Link,log *log15.Logger, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) (*Context) {
 	processAllInterpolations( cell.Model.Data, flow );
-	return &Context{Client: cl, Log: *log, Context: ctx, Channel: channel, Cell: cell, Flow: flow, Runner: runner};
+	return &Context{Client: cl, Log: *log, Context: ctx, Channel: channel, Cell: cell, Flow: flow, Runner: runner, RecvChannel: recvChannel};
 }
