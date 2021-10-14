@@ -173,6 +173,8 @@ func addCellToFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 	}
 
 	cellInFlow := findCellInFlow(id, flow, channel)
+
+	fmt.Printf("adding cell %s", cellInFlow.Cell.Id)
 	flow.Cells = append(flow.Cells, cellInFlow)
 	createCellData(cellInFlow, flow, channel)
 	return cellInFlow

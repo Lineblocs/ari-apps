@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/CyCoreSystems/ari/v5/rid"
-	"github.com/CyCoreSystems/ari/v5/ext/play"
+	//"github.com/CyCoreSystems/ari/v5/ext/play"
 	"github.com/rotisserie/eris"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
@@ -18,7 +18,7 @@ type BridgeManager struct {
 	Flow *types.Flow
 }
 
-func (man *BridgeManager) ensureBridge(src *ari.Key) (error) {
+func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) (error) {
 	ctx := man.ManagerContext
 	log := ctx.Log
 
@@ -38,7 +38,7 @@ func (man *BridgeManager) ensureBridge(src *ari.Key) (error) {
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go man.manageBridge(&lineBridge, wg)
+	go man.manageBridge(&lineBridge, wg, callType)
 	wg.Wait()
 	if err := bridge.AddChannel(ctx.Channel.Channel.Key().ID); err != nil {
 		log.Error("failed to add channel to bridge", "error", err)
@@ -46,11 +46,13 @@ func (man *BridgeManager) ensureBridge(src *ari.Key) (error) {
 	}
 
 	log.Info("channel added to bridge")
+	go man.startOutboundCall(&lineBridge, callType) 
+
 
 
 	return nil
 }
-func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGroup) {
+func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGroup, callType string) {
 	h := bridge.Bridge
 	ctx := man.ManagerContext
 	log := ctx.Log
@@ -85,14 +87,6 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 			}
 			v := e.(*ari.ChannelEnteredBridge)
 			log.Debug("channel entered bridge", "channel", v.Channel.Name)
-			go man.startOutboundCall(bridge, wg) 
-			
-			func() {
-				log.Debug("Playing sound...")
-				if err := play.Play(ctx.Context, h, play.URI("sound:hello-world")).Err(); err != nil {
-					log.Error("failed to play join sound", "error", err)
-				}
-			}()
 		case e, ok := <-leaveSub.Events():
 			if !ok {
 				log.Error("channel left subscription closed")
@@ -100,17 +94,44 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 			}
 			v := e.(*ari.ChannelLeftBridge)
 			log.Debug("channel left bridge", "channel", v.Channel.Name)
-			go func() {
-				if err := play.Play(ctx.Context, h, play.URI("sound:confbridge-leave")).Err(); err != nil {
-					log.Error("failed to play leave sound", "error", err)
-				}
-			}()
 		}
 	}
 }
 
-func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, wg *sync.WaitGroup) {
+func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup) (error) {
 	ctx := man.ManagerContext
+	lineChannel := ctx.Channel
+	log := ctx.Log
+	endSub := outboundChannel.Channel.Subscribe(ari.Events.StasisEnd)
+	defer endSub.Cancel()
+	startSub := outboundChannel.Channel.Subscribe(ari.Events.StasisStart)
+
+	defer startSub.Cancel()
+	wg.Done()
+	log.Debug("listening for channel events...")
+
+	for {
+
+		select {
+			case <-startSub.Events():
+				log.Debug("started call..")
+
+				if err := lineBridge.Bridge.AddChannel(outboundChannel.Channel.Key().ID); err != nil {
+					log.Error("failed to add channel to bridge", "error", err)
+					return err
+				}
+				log.Debug("added outbound channel to bridge..")
+				lineChannel.Channel.StopRing()
+			case <-endSub.Events():
+				log.Debug("ended call..")
+
+		}
+	}
+}
+
+func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType string) {
+	ctx := man.ManagerContext
+	channel := ctx.Channel
 	cell := ctx.Cell
 	model := cell.Model
 	log := ctx.Log
@@ -119,6 +140,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, wg *sync.W
 	log.Debug("startOutboundCall called..")
 
 	callerId := utils.DetermineCallerId( flow.RootCall, model.Data["caller_id"].ValueStr )
+	log.Debug("caller ID was set to: " + callerId)
 
 	valid, err := api.VerifyCallerId(strconv.Itoa( user.Workspace.Id ), callerId)
 	if err != nil {
@@ -164,8 +186,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, wg *sync.W
 
 	log.Info("creating outbound call...")
 	resp, err := api.SendHttpRequest( "/call/createCall", body )
-	outChannel := types.LineChannel{
-		Channel: outboundChannel }
+	outChannel := types.LineChannel{}
 	_, err = utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
 
 	if err != nil {
@@ -174,39 +195,27 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, wg *sync.W
 	}
 
 	domain := user.Workspace.Domain
-	headers := utils.CreateSIPHeaders(domain, callerId, "extension")
-	outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
-	return
 
-	/*
-	startSub := outChannel.Channel.Subscribe(ari.Events.StasisStart)
-	defer startSub.Cancel()
-	destSub := outChannel.Channel.Subscribe(ari.Events.ChannelDestroyed)
-	defer destSub.Cancel()
-	endSub := outChannel.Channel.Subscribe(ari.Events.StasisEnd)
-	defer endSub.Cancel()
-
-	for {
-
-		select {
-			case <-startSub.Events():
-				log.Debug("call is setup")
-			case <-endSub.Events():
-				log.Debug("call ended..")
-			case <-destSub.Events():
-				log.Debug("call destroyed..")
-		}
-
+	var mappedCallType string
+	if callType == "Extension" {
+		mappedCallType = "extension"
+	} else if callType == "Phone Number" {
+		mappedCallType = "pstn"
 	}
-	*/
+	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType)
+	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 
-
-
-	if err := bridge.Bridge.AddChannel(outChannel.Channel.Key().ID); err != nil {
-		log.Error("failed to add channel to bridge", "error", err)
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
 		return
 	}
-	log.Debug("added outbound channel to bridge..")
+	outChannel.Channel = outboundChannel
+
+	channel.Channel.Ring()
+	wg2 := new(sync.WaitGroup)
+	wg2.Add(1)
+ 	go man.manageOutboundCallLeg(&outChannel, bridge, wg2)
+	wg2.Wait()
 }
 
 func NewBridgeManager(mngrCtx *types.Context, flow *types.Flow) (*BridgeManager) {
@@ -234,7 +243,7 @@ func (man *BridgeManager) StartProcessing() {
 
 	log.Debug("processing call type: " + callType.ValueStr)
 	if callType.ValueStr == "Extension" || callType.ValueStr == "Phone Number" || callType.ValueStr == "Extension Flow"  {
-		man.startSimpleCall()
+		man.startSimpleCall(callType.ValueStr)
 	} else if callType.ValueStr == "Follow Me" {
 	} else if callType.ValueStr == "Queue" {
 	}
@@ -247,8 +256,8 @@ func (man *BridgeManager) StartProcessing() {
 		}
 	}
 }
-func (man *BridgeManager) startSimpleCall() {
+func (man *BridgeManager) startSimpleCall(callType string) {
 	log := man.ManagerContext.Log
 	log.Debug("Starting simple call..")
-	man.ensureBridge(man.ManagerContext.Channel.Channel.Key())
+	man.ensureBridge(man.ManagerContext.Channel.Channel.Key(), callType)
 }

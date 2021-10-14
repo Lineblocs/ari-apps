@@ -86,14 +86,12 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types
 				return
 			}
 
+			v := e.(*ari.ChannelEnteredBridge)
 			numChannelsEntered += 1
 
-			if numChannelsEntered == 2 {
-				lineChannel.Channel.StopRing()
-			}
-
-			v := e.(*ari.ChannelEnteredBridge)
 			log.Debug("channel entered bridge", "channel", v.Channel.Name)
+			log.Debug("num channels in bridge: " + strconv.Itoa( numChannelsEntered) )
+
 		case e, ok := <-leaveSub.Events():
 			if !ok {
 				log.Error("channel left subscription closed")
@@ -113,7 +111,7 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types
 }
 
 
-func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *types.LineChannel, wg *sync.WaitGroup) (error) {
+func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup) (error) {
 
 	endSub := outboundChannel.Channel.Subscribe(ari.Events.StasisEnd)
 	defer endSub.Cancel()
@@ -128,11 +126,15 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 		select {
 			case <-startSub.Events():
 				log.Debug("started call..")
+
+				if err := lineBridge.Bridge.AddChannel(outboundChannel.Channel.Key().ID); err != nil {
+					log.Error("failed to add channel to bridge", "error", err)
+					return err
+				}
+				log.Debug("added outbound channel to bridge..")
 				lineChannel.Channel.StopRing()
-				return nil
 			case <-endSub.Events():
 				log.Debug("ended call..")
-				return nil
 
 		}
 	}
@@ -170,6 +172,7 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 
 
 	log.Info("creating call...")
+	log.Info("calling " + numberToCall)
 	resp, err := api.SendHttpRequest( "/call/createCall", body)
 
 	id := resp.Headers.Get("x-call-id")
@@ -210,7 +213,6 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 
 	log.Info("creating outbound call...")
 	resp, err = api.SendHttpRequest( "/call/createCall", body )
-	outChannel.Channel = outboundChannel
 	_, err = utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
 
 	if err != nil {
@@ -223,39 +225,20 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 
 	domain := user.Workspace.Domain
 	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall)
-	outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
-
-	wg2 := new(sync.WaitGroup)
-	wg2.Add(1)
- 	go manageOutboundCallLeg(lineChannel, &outChannel, wg2)
-	wg2.Wait()
-
-	lineChannel.Channel.Ring()
-	if err := bridge.AddChannel(outChannel.Channel.Key().ID); err != nil {
-		log.Error("failed to add channel to bridge", "error", err)
+	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
 		return err
 	}
-	log.Debug("added outbound channel to bridge..")
 
-	endSub := outboundChannel.Subscribe(ari.Events.StasisEnd)
-	defer endSub.Cancel()
-	startSub := outboundChannel.Subscribe(ari.Events.StasisStart)
 
-	defer startSub.Cancel()
+	outChannel.Channel = outboundChannel
 
-	for {
-
-		select {
-			case <- startSub.Events():
-				log.Debug("started call..")
-				lineChannel.Channel.StopRing()
-				return nil
-			case <- endSub.Events():
-				log.Debug("ended call..")
-				return nil
-
-		}
-	}
+	lineChannel.Channel.Ring()
+	wg2 := new(sync.WaitGroup)
+	wg2.Add(1)
+ 	go manageOutboundCallLeg(lineChannel, &outChannel, &lineBridge, wg2)
+	wg2.Wait()
 
 	return nil
 }
@@ -415,9 +398,11 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 	go attachChannelLifeCycleListeners( flow, lineChannel, ctx, callChannel )
 
 	log.Debug("calling API to create call...")
+	log.Debug("exten is: " + exten)
+	log.Debug("caller ID is: " + callerId)
 	params := types.CallParams{
-		From: exten,
-		To: callerId,
+		From: callerId,
+		To: exten,
 		Status: "start",
 		Direction: "inbound",
 		UserId:  flow.User.Id,
@@ -470,6 +455,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 	vals["number"] = exten
 
 	log.Debug("received action: " + action)
+	log.Debug("EXTEN: " + exten)
 	if action == "h" { // dont handle it
 		fmt.Println("Received h handler - not processing")
 		return
@@ -556,17 +542,17 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
+		h.Answer()
 			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension")
 
 	} else if action == "OUTGOING_PROXY" {
 		callerId := event.Args[ 2 ]
 		domain := event.Args[ 3 ]
 
+			log.Debug("channel key: " + h.Key().ID)
 
 		lineChannel := types.LineChannel{
 			Channel: h }
-
-			log.Debug("looking up domain: " + domain)
 		resp, err := api.GetUserByDomain( domain )
 
 		if err != nil {
@@ -577,7 +563,16 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
-			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn")
+
+		callerInfo, err := api.GetCallerId(user.Workspace.Domain, callerId)
+
+		if err != nil {
+			log.Debug("could not get caller id. error: " + err.Error())
+			return
+		}
+		fmt.Printf("setup caller id: " + callerInfo.CallerId)
+		h.Answer()
+			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn")
 
 	} else if action == "OUTGOING_PROXY_MEDIA" {
 

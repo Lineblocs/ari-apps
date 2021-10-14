@@ -99,7 +99,7 @@ func DetermineNumberToCall(data map[string]types.ModelData) (string) {
 	if callType.ValueStr == "Extension" {
 		return data["extension"].ValueStr
 	} else if callType.ValueStr == "Phone Number" {
-		return data["phone_number"].ValueStr
+		return data["number_to_call"].ValueStr
 	}
 	return ""
 }
@@ -113,7 +113,8 @@ func SafeHangup(lineChannel *types.LineChannel) {
 
 
 func GetSIPSecretKey() string {
-	return "xxx-1"
+	//return "BrVIsXzQx9-7lvRsXMC2V57dA4UEc-G_HwnCpK-zctk"
+	return "BrVIsXzQx9-7lvRsXMC2V57dA4UEc-G_HwnCpK-zctk"
 }
 
 
@@ -121,7 +122,7 @@ func CreateSIPHeaders(domain string, callerId string, typeOfCall string) map[str
 	headers := make( map[string]string )
 	headers["SIPADDHEADER0"] = "X-LineBlocs-Key: " + GetSIPSecretKey()
 	headers["SIPADDHEADER1"] = "X-LineBlocs-Domain: " + domain
-	headers["SIPADDHEADER3"] = "X-LineBlocs-Route-Type: " + typeOfCall
-	headers["SIPADDHEADER4"] ="X-LineBlocs-Caller: " + callerId
+	headers["SIPADDHEADER2"] = "X-LineBlocs-Route-Type: " + typeOfCall
+	headers["SIPADDHEADER3"] ="X-LineBlocs-Caller: " + callerId
 	return headers
 }

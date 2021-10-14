@@ -16,8 +16,11 @@ type APIResponse struct {
 	Headers http.Header
 	Body []byte
 }
-type CallerIdResponse struct {
+type VerifyCallerIdResponse struct {
 	Valid bool `json:"valid"`
+}
+type CallerIdResponse struct {
+	CallerId string `json:"caller_id"`
 }
 type DomainResponse struct {
 	Id int `json:"id"`
@@ -139,7 +142,7 @@ func VerifyCallerId( workspaceId string, callerId string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	var data CallerIdResponse
+	var data VerifyCallerIdResponse
  	err = json.Unmarshal( []byte(res), &data  )
 	if err != nil {
 		return false, err
@@ -181,4 +184,23 @@ func UpdateCall( call *types.Call, status string ) (error) {
 		return err
 	}
 	return nil
+}
+
+func GetCallerId( domain string, extension string ) (*CallerIdResponse, error) {
+	params := make( map[string]string )
+	fmt.Println("looking up caller id for: " + extension)
+	params["domain"] = domain
+	params["extension"] = extension
+	res, err := SendGetRequest("/user/getCallerIdToUse", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var data CallerIdResponse
+ 	err = json.Unmarshal( []byte(res), &data  )
+	if err != nil {
+		return nil, err
+	}
+
+	return &data, nil
 }
