@@ -166,7 +166,11 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 		return "", err
 	}
 
-	filepath := folder + (uniq.String() + ".wav")
+	var filename = url
+	var ext = filepath.Ext(filename)
+	//var name = filename[0:len(filename)-len(extension)]
+
+	filepath := folder + (uniq.String() + "." + ext)
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
@@ -176,6 +180,16 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	path, err := changeAudioEncoding( filepath, ext )
+	if err != nil {
+		return "", err
+	}
+	
+
 	return "", err
 }
 
@@ -246,37 +260,19 @@ func StartTTS(flow *types.Flow, say string, gender string, voice string, lang st
 
 
 
-func changeAudioEncoding(filepath string) (string, error) {
+func changeAudioEncoding(filepath string, ext string) (string, error) {
 	channel := 1
-	in := sox.OpenRead(filePath)
-	if in == nil {
-		return "", errors.New("Failed to open " + inputName)
+	newfile = filepath + ".wav"
+
+
+	err := ffmpeg_go.Input(filepath).Output(newfile, ffmpeg_go.KwArgs{
+			"acodec": "pcm_u8",
+			"ar": "8000",
+	}).OverWriteOutput().Run()
+
+	if err != nil {
+		return "", err
 	}
-	defer in.Release()
-
-	out := sox.OpenWrite(outputName, in.Signal(), in.Encoding(), nil)
-	if out == nil {
-		return "", errors.New("Failed to open " + outputName)
-	}
-	defer out.Release()
-
-	chain := sox.CreateEffectsChain(in.Encoding(), out.Encoding())
-	e := sox.CreateEffect(sox.FindEffect("input"))
-	e.Options(in)
-	chain.Add(e, in.Signal(), in.Signal())
-	e.Release()
-
-	e = sox.CreateEffect(sox.FindEffect("remix"))
-	e.Options(channel)
-	chain.Add(e, in.Signal(), in.Signal())
-	e.Release()
-
-	e = sox.CreateEffect(sox.FindEffect("output"))
-	e.Options(out)
-	chain.Add(e, in.Signal(), in.Signal())
-	e.Release()
-
-	chain.Flow()
-	return "", nil
+	return newfile, nil
 
 }
