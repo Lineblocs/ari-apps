@@ -43,7 +43,10 @@ func CheckFreeTrial( plan string ) bool {
 }
 
 func FindLinkByName( links []*types.Link, direction string, tag string) (*types.Link, error) {
+		fmt.Println("FindLinkByName called...")
 	for _, link := range links {
+		fmt.Println("FindLinkByName checking source port: " + link.Target.Cell.Source.Port)
+		fmt.Println("FindLinkByName checking target port: " + link.Target.Cell.Target.Port)
 		if direction == "source" {
 			if link.Source.Cell.Source.Port == tag {
 				return link, nil

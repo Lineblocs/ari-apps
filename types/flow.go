@@ -158,8 +158,9 @@ func createCellData(cell *Cell, flow *Flow, channel *LineChannel) {
 
 	for _, item := range flow.Vars.Graph.Cells {
 		if item.Type == "devs.FlowLink" {
-			fmt.Printf("processing link %s", item.Type)
+			fmt.Printf("createCellData processing link %s\r\n", item.Type)
 			if item.Source.Id == cell.Cell.Id {
+				fmt.Printf("createCellData adding target link %s\r\n", item.Target.Id)
 				destCell := addCellToFlow( item.Target.Id, flow, channel )
 				link := &Link{
 					Link: item,
@@ -167,6 +168,7 @@ func createCellData(cell *Cell, flow *Flow, channel *LineChannel) {
 					Target: destCell }
 				sourceLinks = append( sourceLinks, link )
 			} else if item.Target.Id == cell.Cell.Id {
+				fmt.Printf("createCellData adding source link %s\r\n", item.Target.Id)
 				srcCell := addCellToFlow( item.Target.Id, flow, channel )
 				link := &Link{
 					Link: item,

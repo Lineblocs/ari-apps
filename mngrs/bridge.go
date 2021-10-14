@@ -59,7 +59,7 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	ctx := man.ManagerContext
 	cell := ctx.Cell
 	log := ctx.Log
-	next, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Connected Call Ended")
+	next, _ := utils.FindLinkByName( cell.TargetLinks, "source", "Connected Call Ended")
 
 	log.Debug("manageBridge called..")
 	// Delete the bridge when we exit
@@ -98,9 +98,7 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 			v := e.(*ari.ChannelLeftBridge)
 			log.Debug("channel left bridge", "channel", v.Channel.Name)
 			man.endBridgeCall(bridge)
-			if next != nil {
-				man.ManagerContext.RecvChannel <- *next
-			}
+			man.ManagerContext.RecvChannel <- *next
 		}
 	}
 }
