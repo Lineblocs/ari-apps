@@ -12,6 +12,7 @@ require (
 require (
 	cloud.google.com/go v0.97.0 // indirect
 	cloud.google.com/go/texttospeech v1.0.0 // indirect
+	github.com/aws/aws-sdk-go v1.41.3 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -19,11 +20,14 @@ require (
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/lestrrat-go/backoff/v2 v2.0.8 // indirect
 	github.com/lestrrat-go/option v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/u2takey/ffmpeg-go v0.3.0 // indirect
+	github.com/u2takey/go-utils v0.0.0-20210821132353-e90f7c6bacb5 // indirect
 	github.com/zaf/resample v0.0.0-20200305235742-54008d320155 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/net v0.0.0-20211014172544-2b766c08f1c0 // indirect
