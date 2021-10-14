@@ -4,9 +4,24 @@ import (
 	"errors"
 	"strconv"
 	"time"
+	"context"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"io"
+	"fmt"
 	"lineblocs.com/processor/types"
 	"github.com/CyCoreSystems/ari/v5"
+	"github.com/inconshreveable/log15"
+	"github.com/google/uuid"
+		_ "github.com/krig/go-sox"
+	        texttospeech "cloud.google.com/go/texttospeech/apiv1"
+        texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
 )
+
+
+var log log15.Logger
+
 // TODO get the ip
 func GetPublicIp( ) string {
 	return "0.0.0.0"
@@ -125,4 +140,143 @@ func CreateSIPHeaders(domain string, callerId string, typeOfCall string) map[str
 	headers["SIPADDHEADER2"] = "X-LineBlocs-Route-Type: " + typeOfCall
 	headers["SIPADDHEADER3"] ="X-LineBlocs-Caller: " + callerId
 	return headers
+}
+
+func GetLogger() (log15.Logger) {
+	if log == nil {
+ 		newLog := log15.New()
+		 log =newLog
+	}
+	return log
+}
+
+
+func DownloadFile(flow *types.Flow, url string) (string, error) {
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var folder string = "/var/lib/asterisk/sounds/en/lineblocs/"
+	uniq, err := uuid.NewUUID()
+	if err != nil {
+		log.Error(err.Error())
+		return "", err
+	}
+
+	filepath := folder + (uniq.String() + ".wav")
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return "", err
+}
+
+func StartTTS(flow *types.Flow, say string, gender string, voice string, lang string) (string, error) {
+	// Instantiates a client.
+	ctx := context.Background()
+
+	client, err := texttospeech.NewClient(ctx)
+	if err != nil {
+			log.Error(err.Error())
+			return "", err
+	}
+	defer client.Close()
+
+	var ssmlGender texttospeechpb.SsmlVoiceGender
+	if gender == "MALE" {
+		ssmlGender =  texttospeechpb.SsmlVoiceGender_MALE
+	} else if gender == "FEMALE" {
+		ssmlGender =  texttospeechpb.SsmlVoiceGender_FEMALE
+	}
+	// Perform the text-to-speech request on the text input with the selected
+	// voice parameters and audio file type.
+	req := texttospeechpb.SynthesizeSpeechRequest{
+			// Set the text input to be synthesized.
+			Input: &texttospeechpb.SynthesisInput{
+					InputSource: &texttospeechpb.SynthesisInput_Text{Text: say},
+			},
+			// Build the voice request, select the language code ("en-US") and the SSML
+			// voice gender ("neutral").
+			Voice: &texttospeechpb.VoiceSelectionParams{
+				Name: voice,
+					LanguageCode: lang,
+					//SsmlGender:   texttospeechpb.SsmlVoiceGender_NEUTRAL,
+					SsmlGender:   ssmlGender,
+			},
+			// Select the type of audio file you want returned.
+			AudioConfig: &texttospeechpb.AudioConfig{
+					//AudioEncoding: texttospeechpb.AudioEncoding_MP3,
+					AudioEncoding: texttospeechpb.AudioEncoding_LINEAR16,
+					SampleRateHertz: 8000,
+			},
+	}
+
+	resp, err := client.SynthesizeSpeech(ctx, &req)
+	if err != nil {
+			log.Error(err.Error())
+			return "", err
+	}
+
+	// The resp's AudioContent is binary.
+	var folder string = "/var/lib/asterisk/sounds/en/lineblocs/"
+	uniq, err := uuid.NewUUID()
+	if err != nil {
+		log.Error(err.Error())
+		return "", err
+	}
+
+	filename := folder + (uniq.String() + ".wav")
+
+	err = ioutil.WriteFile(filename, resp.AudioContent, 0644)
+	if err != nil {
+			log.Error(err.Error())
+			return "", err
+	}
+	fmt.Printf("Audio content written to file: %v\n", filename)
+	return "", nil
+}
+
+
+
+func changeAudioEncoding(filepath string) (string, error) {
+	channel := 1
+	in := sox.OpenRead(filePath)
+	if in == nil {
+		return "", errors.New("Failed to open " + inputName)
+	}
+	defer in.Release()
+
+	out := sox.OpenWrite(outputName, in.Signal(), in.Encoding(), nil)
+	if out == nil {
+		return "", errors.New("Failed to open " + outputName)
+	}
+	defer out.Release()
+
+	chain := sox.CreateEffectsChain(in.Encoding(), out.Encoding())
+	e := sox.CreateEffect(sox.FindEffect("input"))
+	e.Options(in)
+	chain.Add(e, in.Signal(), in.Signal())
+	e.Release()
+
+	e = sox.CreateEffect(sox.FindEffect("remix"))
+	e.Options(channel)
+	chain.Add(e, in.Signal(), in.Signal())
+	e.Release()
+
+	e = sox.CreateEffect(sox.FindEffect("output"))
+	e.Options(out)
+	chain.Add(e, in.Signal(), in.Signal())
+	e.Release()
+
+	chain.Flow()
+	return "", nil
+
 }

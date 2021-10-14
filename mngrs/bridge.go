@@ -230,6 +230,7 @@ func (man *BridgeManager) StartProcessing() {
 	log.Debug( "Creating bridge... ")
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
+	user := flow.User
 	channel := man.ManagerContext.Channel
 	data := cell.Model.Data
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Connected Call Ended")
@@ -242,8 +243,12 @@ func (man *BridgeManager) StartProcessing() {
 	_ = types.NewRecording(flow.User, channel, true)
 
 	log.Debug("processing call type: " + callType.ValueStr)
-	if callType.ValueStr == "Extension" || callType.ValueStr == "Phone Number" || callType.ValueStr == "Extension Flow"  {
+	if callType.ValueStr == "Extension" || callType.ValueStr == "Phone Number" {
 		man.startSimpleCall(callType.ValueStr)
+
+	} else if callType.ValueStr == "ExtensionFlow" {
+		extension := data["extension"].ValueStr
+		man.initiateExtFlow(user, extension)
 	} else if callType.ValueStr == "Follow Me" {
 	} else if callType.ValueStr == "Queue" {
 	}
@@ -260,4 +265,37 @@ func (man *BridgeManager) startSimpleCall(callType string) {
 	log := man.ManagerContext.Log
 	log.Debug("Starting simple call..")
 	man.ensureBridge(man.ManagerContext.Channel.Channel.Key(), callType)
+}
+
+func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
+	ctx := man.ManagerContext
+	log := man.ManagerContext.Log
+	log.Debug("Starting new ext flow..")
+	workspace := user.Workspace.Id
+	channel := ctx.Channel
+	client := ctx.Client
+
+	info, err := api.GetExtensionFlowInfo(strconv.Itoa(workspace), extension)
+	if err != nil {
+		log.Debug("error starting new flow: " + err.Error())
+		return
+	}
+	//user := types.NewUser(data.CreatorId, data.WorkspaceId, data.WorkspaceName)
+	flow := types.NewFlow(
+		user,
+		info,
+		channel, 
+		client)
+
+	vars := make( map[string] string )
+	go ProcessFlow( client, man.ManagerContext.Context, flow, channel, vars, flow.Cells[ 0 ])
+	/*
+	for {
+		select {
+			case <-ctx.Done():
+				return
+		}
+	}
+	*/
+
 }

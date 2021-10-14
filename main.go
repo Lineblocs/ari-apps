@@ -12,7 +12,6 @@ import (
 	"errors"
 	"encoding/json"
 
-	"github.com/inconshreveable/log15"
 	"github.com/rotisserie/eris"
 
 	"github.com/CyCoreSystems/ari/v5"
@@ -28,7 +27,6 @@ import (
 var ariApp = "lineblocs"
 
 var bridge *ari.BridgeHandle
-var log log15.Logger
 
 type APIResponse struct {
 	Headers http.Header
@@ -36,12 +34,14 @@ type APIResponse struct {
 }
 
 func logFormattedMsg(msg string) {
+ 	log := utils.GetLogger()
 	log.Debug(fmt.Sprintf("msg = %s", msg))
 
 }
 
 
 func createARIConnection(connectCtx context.Context) (ari.Client, error) {
+ 	log := utils.GetLogger()
        cl, err := native.Connect(&native.Options{
                Application:  ariApp,
                Username:     os.Getenv("ARI_USERNAME"),
@@ -57,6 +57,7 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
  }
 
 func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types.LineChannel, outboundChannel *types.LineChannel, wg *sync.WaitGroup) {
+ 	log := utils.GetLogger()
 	h := bridge.Bridge
 
 	log.Debug("manageBridge called..")
@@ -113,6 +114,7 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types
 
 func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup) (error) {
 
+ 	log := utils.GetLogger()
 	endSub := outboundChannel.Channel.Subscribe(ari.Events.StasisEnd)
 	defer endSub.Cancel()
 	startSub := outboundChannel.Channel.Subscribe(ari.Events.StasisStart)
@@ -142,6 +144,7 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 
 
 func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string) (error) {
+ 	log := utils.GetLogger()
 	log.Debug("ensureBridge called..")
 	var bridge *ari.BridgeHandle 
 	var err error
@@ -245,7 +248,7 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 
 
 func main() {
- 	log = log15.New()
+ 	log := utils.GetLogger()
 	// OPTIONAL: setup logging
 	native.Logger = log
 
@@ -296,6 +299,7 @@ func createCallDebit(user *types.User, call *types.Call, direction string) (erro
 	return nil
 }
 func attachChannelLifeCycleListeners( flow* types.Flow, channel* types.LineChannel, ctx context.Context, callChannel chan *types.Call) {
+ 	log := utils.GetLogger()
 	var call *types.Call 
 	endSub := channel.Channel.Subscribe(ari.Events.StasisEnd)
 	defer endSub.Cancel()
@@ -339,6 +343,7 @@ func attachChannelLifeCycleListeners( flow* types.Flow, channel* types.LineChann
 	}
 }
 func attachDTMFListeners( channel* types.LineChannel, ctx context.Context) {
+ 	log := utils.GetLogger()
 	dtmfSub := channel.Channel.Subscribe(ari.Events.ChannelDtmfReceived)
 	defer dtmfSub.Cancel()
 
@@ -354,45 +359,8 @@ func attachDTMFListeners( channel* types.LineChannel, ctx context.Context) {
 }
 
 
-type Instruction func( context *types.Context, flow *types.Flow)
-
-func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell, runner *types.Runner) {
-	log.Debug("processing cell type " + cell.Cell.Type)
-	if runner.Cancelled {
-		log.Debug("flow runner was cancelled - exiting")
-		return
-	}
-	log.Debug("source link count: " + strconv.Itoa( len( cell.SourceLinks )))
-	log.Debug("target link count: " + strconv.Itoa( len( cell.TargetLinks )))
-	lineCtx := types.NewContext(
-		cl,
-		ctx,
-		&log,
-		flow,
-		cell,
-		runner,
-		lineChannel)
-	// execute it
-	switch ; cell.Cell.Type {
-		case "devs.LaunchModel":
-			for _, link := range cell.SourceLinks {
-				go startProcessingFlow( cl, ctx, flow, lineChannel, eventVars, link.Target, runner)
-			}
-		case "devs.SwitchModel":
-		case "devs.BridgeModel":
-			mngr := mngrs.NewBridgeManager(lineCtx, flow)
-			mngr.StartProcessing()
-		case "devs.DialModel":
-		default:
-	}
-}
-func processFlow( cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell) {
-	log.Debug("processing cell type " + cell.Cell.Type)
-	runner:=types.Runner{Cancelled: false}
-	flow.Runners = append( flow.Runners, &runner )
-	startProcessingFlow( cl, ctx, flow, lineChannel, eventVars, cell, &runner)
-}
 func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string ) {
+ 	log := utils.GetLogger()
 	go attachDTMFListeners( lineChannel, ctx )
 	callChannel := make(chan *types.Call)
 	go attachChannelLifeCycleListeners( flow, lineChannel, ctx, callChannel )
@@ -435,7 +403,7 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 	log.Debug("answering call..")
 	lineChannel.Channel.Answer()
 	vars := make( map[string] string )
-	go processFlow( cl, ctx, flow, lineChannel, vars, flow.Cells[ 0 ])
+	go mngrs.ProcessFlow( cl, ctx, flow, lineChannel, vars, flow.Cells[ 0 ])
 	callChannel <-  &call
 	for {
 		select {
@@ -447,6 +415,7 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 
 
 func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context,  h *ari.ChannelHandle) {
+ 	log := utils.GetLogger()
 	log.Info("running app", "channel", h.Key().ID)
 
 	action := event.Args[ 0 ]
