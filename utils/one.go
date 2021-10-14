@@ -10,11 +10,12 @@ import (
 	"os"
 	"io"
 	"fmt"
+	"path"
 	"lineblocs.com/processor/types"
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/inconshreveable/log15"
 	"github.com/google/uuid"
-		_ "github.com/krig/go-sox"
+	"github.com/u2takey/ffmpeg-go"
 	        texttospeech "cloud.google.com/go/texttospeech/apiv1"
         texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
 )
@@ -166,8 +167,8 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 		return "", err
 	}
 
-	var filename = url
-	var ext = filepath.Ext(filename)
+	var filename string = url
+	var ext = path.Ext(filename)
 	//var name = filename[0:len(filename)-len(extension)]
 
 	filepath := folder + (uniq.String() + "." + ext)
@@ -184,13 +185,13 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 		return "", err
 	}
 
-	path, err := changeAudioEncoding( filepath, ext )
+	fullPathToFile, err := changeAudioEncoding( filepath, ext )
 	if err != nil {
 		return "", err
 	}
 	
 
-	return "", err
+	return path.Base( fullPathToFile ), err
 }
 
 func StartTTS(flow *types.Flow, say string, gender string, voice string, lang string) (string, error) {
@@ -261,8 +262,7 @@ func StartTTS(flow *types.Flow, say string, gender string, voice string, lang st
 
 
 func changeAudioEncoding(filepath string, ext string) (string, error) {
-	channel := 1
-	newfile = filepath + ".wav"
+	newfile := filepath + ".wav"
 
 
 	err := ffmpeg_go.Input(filepath).Output(newfile, ffmpeg_go.KwArgs{
