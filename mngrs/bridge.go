@@ -74,6 +74,7 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	leaveSub := h.Subscribe(ari.Events.ChannelLeftBridge)
 	defer leaveSub.Cancel()
 
+
 	wg.Done()
 	log.Debug("listening for bridge events...")
 	for {
@@ -115,10 +116,17 @@ func (man *BridgeManager) endBridgeCall( lineBridge *types.LineBridge ) {
 	// TODO:  billing
 
 }
-func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) (error) {
+func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) {
 	ctx := man.ManagerContext
 	lineChannel := ctx.Channel
+	cell := ctx.Cell
 	log := ctx.Log
+
+	next, err := utils.FindLinkByName( cell.TargetLinks, "source", "Caller Hung Up")
+	if err != nil {
+		log.Debug("error finding link.. ")
+	}
+
 	endSub := outboundChannel.Channel.Subscribe(ari.Events.StasisEnd)
 	defer endSub.Cancel()
 	startSub := outboundChannel.Channel.Subscribe(ari.Events.StasisStart)
@@ -138,15 +146,20 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 
 				if err := lineBridge.Bridge.AddChannel(outboundChannel.Channel.Key().ID); err != nil {
 					log.Error("failed to add channel to bridge", "error", err)
-					return err
+					return
 				}
 				log.Debug("added outbound channel to bridge..")
+				log.Debug("exiting...")
 				lineChannel.Channel.StopRing()
  				ringTimeoutChan <- true
+				 return
 			case <-endSub.Events():
 				log.Debug("ended call..")
+				return
 			case <-rootEndSub.Events():
 				log.Debug("root inded call..")
+				man.ManagerContext.RecvChannel <- *next
+				return
 
 		}
 	}

@@ -34,6 +34,8 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 				go startProcessingFlow( cl, ctx, flow, lineChannel, eventVars, link.Target, runner)
 			}
 		case "devs.SwitchModel":
+			mngr := NewSwitchManager(lineCtx, flow)
+			mngr.StartProcessing()
 		case "devs.BridgeModel":
 			mngr := NewBridgeManager(lineCtx, flow)
 			mngr.StartProcessing()
@@ -44,6 +46,14 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 			mngr := NewInputManager(lineCtx, flow)
 			mngr.StartProcessing()
 		case "devs.DialModel":
+			mngr := NewDialManager(lineCtx, flow)
+			mngr.StartProcessing()
+		case "devs.SetVariablesModel":
+			mngr := NewSetVariablesManager(lineCtx, flow)
+			mngr.StartProcessing()
+		case "devs.WaitModel":
+			mngr := NewWaitManager(lineCtx, flow)
+			mngr.StartProcessing()
 		default:
 	}
 	for {
