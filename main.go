@@ -196,6 +196,32 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 	lineBridge := types.NewBridge(bridge)
 	
 	log.Info("channel added to bridge")
+	outboundChannel, err := cl.Channel().Create(nil, utils.CreateChannelRequest( numberToCall )	)
+
+	if err != nil {
+		log.Debug("error creating outbound channel: " + err.Error())
+		return err
+	}
+
+
+	log.Debug("Originating call...")
+
+
+	domain := user.Workspace.Domain
+	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall)
+	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return err
+	}
+
+
+	stopChannel := make( chan bool )
+	outChannel.Channel = outboundChannel
+
+
+
+
 
 
 	params := types.CallParams{
@@ -204,7 +230,8 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 		Status: "start",
 		Direction: "outbound",
 		UserId:  user.Id,
-		WorkspaceId: user.Workspace.Id }
+		WorkspaceId: user.Workspace.Id,
+		ChannelId: outboundChannel.ID() }
 	body, err := json.Marshal( params )
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )
@@ -216,13 +243,13 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 	log.Info("calling " + numberToCall)
 	resp, err := api.SendHttpRequest( "/call/createCall", body)
 
-	id := resp.Headers.Get("x-call-id")
-	log.Debug("Call ID is: " + id)
-	idAsInt, err := strconv.Atoi(id)
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )
 		return err
 	}
+	id := resp.Headers.Get("x-call-id")
+	log.Debug("Call ID is: " + id)
+	idAsInt, err := strconv.Atoi(id)
 
 	call := types.Call{
 		CallId: idAsInt,
@@ -240,17 +267,6 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 		return errors.New( "failed to add channel to bridge" )
 	}
 
-	log.Info("channel added to bridge")
-	log.Debug("calling ext: " + numberToCall)
-
-	// create outbound leg
-	outboundChannel, err := cl.Channel().Create(nil, utils.CreateChannelRequest( numberToCall )	)
-
-	if err != nil {
-		log.Debug("error creating outbound channel: " + err.Error())
-		return err
-	}
-
 
 	log.Info("creating outbound call...")
 	resp, err = api.SendHttpRequest( "/call/createCall", body )
@@ -261,20 +277,7 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 		return err
 	}
 
-	log.Debug("Originating call...")
 
-
-	domain := user.Workspace.Domain
-	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall)
-	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
-	if err != nil {
-		log.Error( "error occured: " + err.Error() )
-		return err
-	}
-
-
-	stopChannel := make( chan bool )
-	outChannel.Channel = outboundChannel
 
 	lineChannel.Channel.Ring()
 	wg1 := new(sync.WaitGroup)
@@ -422,7 +425,8 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 		Status: "start",
 		Direction: "inbound",
 		UserId:  flow.User.Id,
-		WorkspaceId: flow.User.Workspace.Id }
+		WorkspaceId: flow.User.Workspace.Id,
+		ChannelId: lineChannel.Channel.ID() }
 	body, err := json.Marshal( params )
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )
@@ -432,14 +436,14 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 
 	log.Info("creating call...")
 	resp, err := api.SendHttpRequest( "/call/createCall", body)
-
-	id := resp.Headers.Get("x-call-id")
-	log.Debug("Call ID is: " + id)
-	idAsInt, err := strconv.Atoi(id)
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )
 		return
 	}
+
+	id := resp.Headers.Get("x-call-id")
+	log.Debug("Call ID is: " + id)
+	idAsInt, err := strconv.Atoi(id)
 
 	call := types.Call{
 		CallId: idAsInt,

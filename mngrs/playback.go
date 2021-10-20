@@ -41,7 +41,7 @@ func (man *PlaybackManager) StartProcessing() {
 			log.Error("error downloading: " + err.Error())
 		}
 
-		man.beginPrompt(file)
+		go man.beginPrompt(file)
 	} else if playbackType == "Play" {
 
 		log.Debug("processing TTS")
@@ -50,7 +50,7 @@ func (man *PlaybackManager) StartProcessing() {
 		if err != nil {
 			log.Error("error downloading: " + err.Error())
 		}
-		man.beginPrompt(file)
+		go man.beginPrompt(file)
 
 	}
 
@@ -59,22 +59,27 @@ func (man *PlaybackManager) StartProcessing() {
 func (man *PlaybackManager) beginPrompt(prompt string) {
 	log := man.ManagerContext.Log
 	channel := man.ManagerContext.Channel
+	cell := man.ManagerContext.Cell
 	uri := "sound:" + prompt
 	playback, err := channel.Channel.Play(channel.Channel.Key().ID, uri)
 	if err != nil {
 		log.Error("failed to play join sound", "error", err)
 		return
 	}
+
+	next, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 	finishedSub := playback.Subscribe(ari.Events.PlaybackFinished)
 	defer finishedSub.Cancel()
 
+	log.Debug("waiting for playback to finish...")
 	for {
 		select {
 		case <-finishedSub.Events():
 			log.Debug("playback finished...")
-			return
-		default:
-			log.Debug("no response received..")
+			resp := types.ManagerResponse{
+				Channel: channel,
+				Link: next }
+			man.ManagerContext.RecvChannel <- &resp
 			return
 		}
 	}

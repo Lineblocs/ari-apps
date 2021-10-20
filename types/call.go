@@ -15,6 +15,7 @@ type CallParams struct {
 	Direction string `json:"direction"`
 	UserId int `json:"user_id"`
 	WorkspaceId int `json:"workspace_id"`
+	ChannelId string `json:"channel_id"`
 }
 type Call struct {
 	Bridge *LineBridge

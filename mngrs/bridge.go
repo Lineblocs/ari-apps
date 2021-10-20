@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"context"
 	"time"
+	"strings"
 	"encoding/json"
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/CyCoreSystems/ari/v5/rid"
@@ -48,11 +49,38 @@ func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) (error) {
 	}
 
 	log.Info("channel added to bridge")
+	man.addAllRequestedCalls(lineBridge);
 	go man.startOutboundCall(lineBridge, callType) 
 
 
 
 	return nil
+}
+
+func (man *BridgeManager) addAllRequestedCalls(bridge *types.LineBridge) {
+	ctx := man.ManagerContext
+	log := ctx.Log
+	cell := ctx.Cell
+	data := cell.Model.Data
+	extras := data["extra_call_ids"]
+
+	log.Debug("looking up requested channels")
+	if extras.ValueStr != "" {
+		ids := strings.Split(extras.ValueStr, ",")
+		for _, id := range ids {
+			log.Debug("adding requested channel: " + id)
+			call, err := api.FetchCall( id )
+			if err != nil {
+				log.Debug("error fetching requested channel: " + err.Error())
+				continue
+			}
+
+			key := ari.NewKey(ari.ChannelKey, call.ChannelId)
+			channel := ctx.Client.Channel().Get(key)
+			reqChannel := types.LineChannel{ Channel: channel }
+			utils.AddChannelToBridge( bridge, &reqChannel )
+		}
+	}
 }
 func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGroup, callType string) {
 	h := bridge.Bridge
@@ -203,6 +231,8 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 
 	timeout := utils.ParseRingTimeout( model.Data["timeout"].ValueStr )
 
+	outChannel := types.LineChannel{}
+
 	/*
 	src := channel.Channel.Key()
 
@@ -213,29 +243,6 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 
 	if err != nil {
 		log.Debug("error creating outbound channel: " + err.Error())
-		return
-	}
-
-	params := types.CallParams{
-		From: callerId,
-		To: numberToCall,
-		Status: "start",
-		Direction: "outbound",
-		UserId:  flow.User.Id,
-		WorkspaceId: flow.User.Workspace.Id }
-	body, err := json.Marshal( params )
-	if err != nil {
-		log.Error( "error occured: " + err.Error() )
-		return
-	}
-
-	log.Info("creating outbound call...")
-	resp, err := api.SendHttpRequest( "/call/createCall", body )
-	outChannel := types.LineChannel{}
-	_, err = utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
-
-	if err != nil {
-		log.Error( "error occured: " + err.Error() )
 		return
 	}
 
@@ -255,6 +262,31 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 		return
 	}
 	outChannel.Channel = outboundChannel
+
+	params := types.CallParams{
+		From: callerId,
+		To: numberToCall,
+		Status: "start",
+		Direction: "outbound",
+		UserId:  flow.User.Id,
+		WorkspaceId: flow.User.Workspace.Id,
+		ChannelId: outboundChannel.ID() }
+	body, err := json.Marshal( params )
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return
+	}
+
+	log.Info("creating outbound call...")
+	resp, err := api.SendHttpRequest( "/call/createCall", body )
+	_, err = utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
+
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return
+	}
+
+
 
 	stopChannel := make( chan bool )
 	channel.Channel.Ring()

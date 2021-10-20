@@ -67,7 +67,7 @@ func (man *InputManager) StartProcessing() {
 			log.Error("error downloading: " + err.Error())
 		}
 
-		man.beginPrompt(file, stopChannel)
+		go man.beginPrompt(file, stopChannel)
 	} else if playbackType == "Play" {
 
 		log.Debug("processing TTS")
@@ -76,7 +76,7 @@ func (man *InputManager) StartProcessing() {
 		if err != nil {
 			log.Error("error downloading: " + err.Error())
 		}
-		man.beginPrompt(file, stopChannel)
+		go man.beginPrompt(file, stopChannel)
 
 	}
 }

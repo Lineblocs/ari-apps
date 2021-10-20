@@ -121,6 +121,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	timeout := utils.ParseRingTimeout( model.Data["timeout"].ValueStr )
 
+	outChannel := types.LineChannel{}
 	/*
 	src := channel.Channel.Key()
 
@@ -131,29 +132,6 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	if err != nil {
 		log.Debug("error creating outbound channel: " + err.Error())
-		return
-	}
-
-	params := types.CallParams{
-		From: callerId,
-		To: numberToCall,
-		Status: "start",
-		Direction: "outbound",
-		UserId:  flow.User.Id,
-		WorkspaceId: flow.User.Workspace.Id }
-	body, err := json.Marshal( params )
-	if err != nil {
-		log.Error( "error occured: " + err.Error() )
-		return
-	}
-
-	log.Info("creating outbound call...")
-	resp, err := api.SendHttpRequest( "/call/createCall", body )
-	outChannel := types.LineChannel{}
-	_, err = utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
-
-	if err != nil {
-		log.Error( "error occured: " + err.Error() )
 		return
 	}
 
@@ -173,6 +151,36 @@ func (man *DialManager) startOutboundCall(callType string) {
 		return
 	}
 	outChannel.Channel = outboundChannel
+
+
+
+
+	params := types.CallParams{
+		From: callerId,
+		To: numberToCall,
+		Status: "start",
+		Direction: "outbound",
+		UserId:  flow.User.Id,
+		WorkspaceId: flow.User.Workspace.Id,
+		ChannelId: outboundChannel.ID() }
+	body, err := json.Marshal( params )
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return
+	}
+
+	log.Info("creating outbound call...")
+	resp, err := api.SendHttpRequest( "/call/createCall", body )
+	_, err = utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
+
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return
+	}
+
+
+
+
 
 	stopChannel := make( chan bool )
 	wg1 := new(sync.WaitGroup)
