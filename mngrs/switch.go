@@ -20,6 +20,9 @@ func NewSwitchManager(mngrCtx *types.Context, flow *types.Flow) (*SwitchManager)
 	return &item
 }
 func (man *SwitchManager) StartProcessing() {
+	go man.startTestForCondition( );
+}
+func (man *SwitchManager) startTestForCondition() {
 	log := man.ManagerContext.Log
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
@@ -36,10 +39,12 @@ func (man *SwitchManager) StartProcessing() {
 	if strings.HasPrefix(test, "{{") && strings.HasSuffix(test, "}}") {
 		result = before
 	} else {
+		log.Debug("test variable: " + test)
 		splitted := strings.Split(test, ".")
 		if  len( splitted ) > 1 {
 			name := splitted[ 0 ]
-			variable := strings.Join(splitted[ 1:len( splitted ) - 1 ], ".")
+			variable := strings.Join(splitted[ 1:len( splitted ) ], ".")
+			log.Debug("looking UP: " + variable)
 			value, err := utils.LookupCellVariable( flow, name, variable )
 			if err != nil {
 				log.Debug("cell lookup error: " + err.Error())
@@ -47,12 +52,17 @@ func (man *SwitchManager) StartProcessing() {
 			result = value
 		}
 	}
+	log.Debug("result is: " + result)
 
 	var matched *types.ModelLink
 	for _, link := range links {
 		cond := link.Condition
 		condType := link.Type
 		value := link.Value
+
+		log.Debug("Cond type: " + condType);
+		log.Debug("Cond: " + cond);
+		log.Debug("Value: " + value);
 		if condType == "LINK_CONDITION_MATCHES" {
 			if cond == "Equals" && result == value {
 				// matched
@@ -73,16 +83,22 @@ func (man *SwitchManager) StartProcessing() {
 	if matched != nil {
 
 		for _, item := range sourceLinks {
+			log.Debug("comparing 1: " + matched.Cell);
+			log.Debug("comparing 2: " + item.Target.Model.Name);
 			if item.Target.Model.Name == matched.Cell {
-
+				log.Debug("found match - going to result..");
 				resp := types.ManagerResponse{
 					Channel: channel,
 					Link: item }
 				man.ManagerContext.RecvChannel <- &resp
+				return;
 			}
 		}
 	}
-
+				resp := types.ManagerResponse{
+					Channel: channel,
+					Link: nil }
+				man.ManagerContext.RecvChannel <- &resp
 
 
 }

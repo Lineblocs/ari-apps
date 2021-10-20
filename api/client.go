@@ -31,6 +31,23 @@ type DomainResponse struct {
 type FlowResponse struct {
 	FlowJson string `json:"flow_json"`
 }
+
+type CallResponse struct {
+  From string `json:"from"`
+  To string `json:"to"`
+  Status string `json:"status"`
+  Direction string `json:"direction"`
+  Duration string `json:"duration"`
+  UserId int `json:"user_id"`
+  WorkspaceId int  `json:"workspace_id"`
+  APIId string `json:"api_id"`
+  SourceIp string `json:"source_ip"`
+  ChannelId string `json:"channel_id"`
+  StartedAt string `json:"started_at"`
+  CreatedAt string `json:"created_at"`
+  UpdatedAt string `json:"updated_at"`
+  PlanSnapshot string `json:"plan_snapshot"`
+}
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     url := "https://internals.lineblocs.com" + path
     fmt.Println("URL:>", url)
@@ -236,4 +253,24 @@ func GetExtensionFlowInfo(workspace string, extension string) (*types.FlowVars, 
 	}
 
 	return &flowJson, nil
+}
+
+func FetchCall(callId string) (*CallResponse, error) {
+	params := make( map[string]string )
+	fmt.Println("looking up call id: " + callId)
+	params["id"] = callId
+	res, err := SendGetRequest("/call/fetchCall", params)
+	if err != nil {
+		return nil, err
+	}
+
+
+	var data CallResponse
+	err = json.Unmarshal( []byte(res), &data )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+
+	return &data, nil
 }

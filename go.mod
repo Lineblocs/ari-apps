@@ -12,7 +12,7 @@ require (
 require (
 	cloud.google.com/go v0.97.0 // indirect
 	cloud.google.com/go/texttospeech v1.0.0 // indirect
-	github.com/aws/aws-sdk-go v1.41.3 // indirect
+	github.com/aws/aws-sdk-go v1.41.7 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect

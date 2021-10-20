@@ -57,6 +57,8 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 			mngr.StartProcessing()
 		default:
 	}
+
+	log.Debug("waiting to receive from channel...")
 	for {
 		select {
 			case resp, ok := <-manRecvChannel:

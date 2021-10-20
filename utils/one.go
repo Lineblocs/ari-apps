@@ -16,6 +16,9 @@ import (
 	"github.com/inconshreveable/log15"
 	"github.com/google/uuid"
 	"github.com/u2takey/ffmpeg-go"
+	    "github.com/aws/aws-sdk-go/aws"
+    "github.com/aws/aws-sdk-go/aws/session"
+	    "github.com/aws/aws-sdk-go/service/s3/s3manager"
 	        texttospeech "cloud.google.com/go/texttospeech/apiv1"
         texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
 )
@@ -80,6 +83,8 @@ func LookupCellVariable( flow *types.Flow, name string, lookup string) (string, 
 	if cell == nil {
 		return "", errors.New("Could not find cell")
 	}
+	fmt.Println("looking up cell variable\r\n");
+	fmt.Println(cell.Cell.Type);
 	if cell.Cell.Type == "devs.LaunchModel" {
 		if lookup == "call.from" {
 			return cell.EventVars["callFrom"], nil
@@ -113,6 +118,13 @@ func LookupCellVariable( flow *types.Flow, name string, lookup string) (string, 
 		} else if lookup == "ended" {
 			call := cell.AttachedCall
 			return strconv.Itoa( call.FigureOutEndedTime() ), nil
+		}
+	} else if cell.Cell.Type == "devs.ProcessInputModel" {
+		fmt.Println("getting input value..\r\n");
+		if lookup == "digits" {
+			fmt.Println("found:");
+			fmt.Println( cell.EventVars["digits"] );
+			return cell.EventVars["digits"], nil
 		}
 	}
 	return "", errors.New("Could not find link")
@@ -212,11 +224,40 @@ func GetLogger() (log15.Logger) {
 	return log
 }
 
-func sendToAssetServer( path string ) (error, string) {
+func sendToAssetServer( path string, filename string ) (error, string) {
+	sess, err := session.NewSession(&aws.Config{ Region: aws.String(os.Getenv("AWS_DEFAULT_REGION")) })
+	if err != nil {
+		return fmt.Errorf("error occured: %v", err), ""
+	}
+
+
+	// Create an uploader with the session and default options
+	uploader := s3manager.NewUploader(sess)
+
+	f, err  := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open file %q, %v", path, err), ""
+	}
+
+	bucket := "lineblocs"
+	key := "media-streams/" + filename
+
+	fmt.Printf("Uploading to %s\r\n", key)
+	// Upload the file to S3.
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Body:   f,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to upload file, %v", err), ""
+	}
+	fmt.Printf("file uploaded to, %s\n", aws.StringValue(&result.Location))
 
 
 	// send back link to media
-	return nil, ""
+	url := "https://lineblocs.s3.ca-central-1.amazonaws.com/" + key
+	return nil, url
 }
 
 func DownloadFile(flow *types.Flow, url string) (string, error) {
@@ -227,7 +268,7 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	var folder string = "/var/lib/asterisk/sounds/en/lineblocs/"
+	var folder string = "/tmp/"
 	uniq, err := uuid.NewUUID()
 	if err != nil {
 		log.Error(err.Error())
@@ -237,8 +278,8 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 	var filename string = url
 	var ext = path.Ext(filename)
 	//var name = filename[0:len(filename)-len(extension)]
-
-	filepath := folder + (uniq.String() + "." + ext)
+ 	filename = (uniq.String() + "." + ext)
+	filepath := folder + filename
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
@@ -257,7 +298,7 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 		return "", err
 	}
 
-	err, link  := sendToAssetServer( fullPathToFile )
+	err, link  := sendToAssetServer( fullPathToFile, filename )
 	if err != nil {
 		return "", err
 	}
@@ -313,22 +354,23 @@ func StartTTS(flow *types.Flow, say string, gender string, voice string, lang st
 	}
 
 	// The resp's AudioContent is binary.
-	var folder string = "/var/lib/asterisk/sounds/en/lineblocs/"
+	var folder string = "/tmp/"
 	uniq, err := uuid.NewUUID()
 	if err != nil {
 		log.Error(err.Error())
 		return "", err
 	}
 
-	filename := folder + (uniq.String() + ".wav")
+ 	filename := (uniq.String() + ".wav")
+	fullPathToFile := folder + filename
 
-	err = ioutil.WriteFile(filename, resp.AudioContent, 0644)
+	err = ioutil.WriteFile(fullPathToFile, resp.AudioContent, 0644)
 	if err != nil {
 			log.Error(err.Error())
 			return "", err
 	}
-	fmt.Printf("Audio content written to file: %v\n", filename)
-	err, link  := sendToAssetServer(  filename )
+	fmt.Printf("Audio content written to file: %v\n", fullPathToFile)
+	err, link  := sendToAssetServer(  fullPathToFile, filename )
 	if err != nil {
 		return "", err
 	}

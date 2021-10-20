@@ -1,9 +1,11 @@
 package mngrs
 import (
 	//"context"
+	"time"
 	//"github.com/CyCoreSystems/ari/v5"
-
+	"strconv"
 	"lineblocs.com/processor/types"
+	"lineblocs.com/processor/utils"
 )
 type WaitManager struct {
 	ManagerContext *types.Context
@@ -19,6 +21,26 @@ func NewWaitManager(mngrCtx *types.Context, flow *types.Flow) (*WaitManager) {
 }
 func (man *WaitManager) StartProcessing() {
 	log := man.ManagerContext.Log
-	log.Debug("starting wait...")
+	log.Debug("starting WAIT...")
 	//man.ManagerContext.RecvChannel <- *item
+
+	ctx := man.ManagerContext
+	cell := ctx.Cell
+	channel := ctx.Channel
+	model := cell.Model
+	completed, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Completed")
+
+	val, err := strconv.Atoi( model.Data["wait_seconds"].ValueStr )
+	if err != nil {
+		log.Debug("could not parse wait timeout of: " + model.Data["wait_seconds"].ValueStr )
+		man.ManagerContext.RecvChannel <- nil
+		return
+	}
+
+	time.Sleep(time.Duration( val ) * time.Second)
+
+	resp := types.ManagerResponse{
+		Channel: channel,
+		Link: completed }
+	man.ManagerContext.RecvChannel <- &resp
 }

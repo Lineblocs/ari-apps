@@ -3,6 +3,7 @@ import (
 	//"context"
 	"strconv"
 	"time"
+	"sync"
 	"github.com/CyCoreSystems/ari/v5"
 
 	"lineblocs.com/processor/types"
@@ -41,8 +42,11 @@ func (man *InputManager) StartProcessing() {
 
 	stopGatherOnKeypress := data["stop_gather_on_keypress"].ValueBool
 	keypressKeyStop := data["keypress_key_stop"].ValueStr
- 
-	man.attachDtmfListeners(stopTimeout, maxDigits, stopGatherOnKeypress, keypressKeyStop)
+	stopChannel := make( chan bool, 1 )
+ 	wg1 := new(sync.WaitGroup)
+	wg1.Add(1)
+	go man.attachDtmfListeners(stopTimeout, maxDigits, stopGatherOnKeypress, keypressKeyStop, wg1, stopChannel)
+	wg1.Wait()
 
 	if err != nil {
 		log.Debug("error parsing max digits. value was:  " + data["max_digits"].ValueStr)
@@ -63,7 +67,7 @@ func (man *InputManager) StartProcessing() {
 			log.Error("error downloading: " + err.Error())
 		}
 
-		man.beginPrompt(file)
+		man.beginPrompt(file, stopChannel)
 	} else if playbackType == "Play" {
 
 		log.Debug("processing TTS")
@@ -72,12 +76,12 @@ func (man *InputManager) StartProcessing() {
 		if err != nil {
 			log.Error("error downloading: " + err.Error())
 		}
-		man.beginPrompt(file)
+		man.beginPrompt(file, stopChannel)
 
 	}
 }
 
-func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int, stopGatherOnKeypress bool, keypressKeyStop string) {
+func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int, stopGatherOnKeypress bool, keypressKeyStop string, wg *sync.WaitGroup, stopChannel chan<- bool) {
 	log := man.ManagerContext.Log
 
 	channel := man.ManagerContext.Channel
@@ -89,7 +93,7 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 	timeLastDtmfWasReceived= nil
 	collectedDtmf := ""
 
-
+	wg.Done()
 	for {
 
 		select {
@@ -109,6 +113,7 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 
 				// stop due to key pressed
 				if stopGatherOnKeypress && digit == keypressKeyStop {
+					stopChannel <- true
 					man.finishProcessingDTMF(collectedDtmf)
 					return
 				}
@@ -119,6 +124,7 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 
 					if elapsed > stopTimeout {
 						// time was elapsed
+						stopChannel <- true
 						man.finishProcessingDTMF(collectedDtmf)
 						return
 					}
@@ -126,6 +132,7 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 
 				if len( collectedDtmf ) >= maxDigits {
 					// max digits
+					stopChannel <- true
 					man.finishProcessingDTMF(collectedDtmf)
 					return
 				}
@@ -137,7 +144,7 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 }
 
 
-func (man *InputManager) beginPrompt(prompt string) {
+func (man *InputManager) beginPrompt(prompt string, stopChannel <-chan bool) {
 	log := man.ManagerContext.Log
 	channel := man.ManagerContext.Channel
 	uri := "sound:" + prompt
@@ -148,25 +155,35 @@ func (man *InputManager) beginPrompt(prompt string) {
 	}
 	finishedSub := playback.Subscribe(ari.Events.PlaybackFinished)
 	defer finishedSub.Cancel()
+	log.Debug("PLAYBACK started...");
 
 	for {
 		select {
 		case <-finishedSub.Events():
 			log.Debug("playback finished...")
 			return
-		default:
-			log.Debug("no response received..")
+
+		case <-stopChannel:
+			log.Debug("requested playback stop..");
+			err := playback.Stop()
+			if err != nil {
+				log.Debug("error occured: " + err.Error());
+			}
 			return
 		}
 	}
 }
 
 func (man *InputManager) finishProcessingDTMF(result string) {
+ 	ctx := man.ManagerContext
 	log := man.ManagerContext.Log
 
 	cell := man.ManagerContext.Cell
 
 	log.Debug("finish processing DTMF...")
 	cell.EventVars["digits"] = result
-
+	digits, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Digits Received")
+	resp := types.ManagerResponse{
+			Channel: ctx.Channel, Link: digits }
+	man.ManagerContext.RecvChannel <- &resp
 }
