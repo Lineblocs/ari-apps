@@ -58,7 +58,6 @@ func (man *PlaybackManager) StartProcessing() {
 
 func (man *PlaybackManager) beginPrompt(prompt string) {
 	log := man.ManagerContext.Log
-	log.Debug( "Creating playback... ")
 	channel := man.ManagerContext.Channel
 	uri := "sound:" + prompt
 	playback, err := channel.Channel.Play(channel.Channel.Key().ID, uri)

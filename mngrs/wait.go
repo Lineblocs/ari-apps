@@ -19,6 +19,6 @@ func NewWaitManager(mngrCtx *types.Context, flow *types.Flow) (*WaitManager) {
 }
 func (man *WaitManager) StartProcessing() {
 	log := man.ManagerContext.Log
-	log.Debug( "Creating playback... ")
+	log.Debug("starting wait...")
 	//man.ManagerContext.RecvChannel <- *item
 }

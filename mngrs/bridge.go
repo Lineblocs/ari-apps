@@ -58,6 +58,7 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	h := bridge.Bridge
 	ctx := man.ManagerContext
 	cell := ctx.Cell
+	channel := ctx.Channel
 	log := ctx.Log
 	next, _ := utils.FindLinkByName( cell.TargetLinks, "source", "Connected Call Ended")
 
@@ -99,7 +100,11 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 			v := e.(*ari.ChannelLeftBridge)
 			log.Debug("channel left bridge", "channel", v.Channel.Name)
 			man.endBridgeCall(bridge)
-			man.ManagerContext.RecvChannel <- *next
+
+			resp := types.ManagerResponse{
+				Channel: channel,
+				Link: next }
+			man.ManagerContext.RecvChannel <- &resp
 		}
 	}
 }
@@ -158,7 +163,10 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 				return
 			case <-rootEndSub.Events():
 				log.Debug("root inded call..")
-				man.ManagerContext.RecvChannel <- *next
+			resp := types.ManagerResponse{
+				Channel: lineChannel,
+				Link: next }
+				man.ManagerContext.RecvChannel <- &resp
 				return
 
 		}

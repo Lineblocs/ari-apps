@@ -22,7 +22,7 @@ func NewInputManager(mngrCtx *types.Context, flow *types.Flow) (*InputManager) {
 }
 func (man *InputManager) StartProcessing() {
 	log := man.ManagerContext.Log
-	log.Debug( "Creating playback... ")
+	log.Debug( "Creating playback for INPUT... ")
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	data := cell.Model.Data
@@ -82,7 +82,7 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 
 	channel := man.ManagerContext.Channel
 	ctx := man.ManagerContext.Context
-	log.Debug( "adding DTMF.." )
+	log.Debug( "listening for DTMF.." )
 	dtmfSub := channel.Channel.Subscribe(ari.Events.ChannelDtmfReceived)
 	defer dtmfSub.Cancel()
 	var timeLastDtmfWasReceived *time.Time
@@ -139,7 +139,6 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 
 func (man *InputManager) beginPrompt(prompt string) {
 	log := man.ManagerContext.Log
-	log.Debug( "Creating playback... ")
 	channel := man.ManagerContext.Channel
 	uri := "sound:" + prompt
 	playback, err := channel.Channel.Play(channel.Channel.Key().ID, uri)

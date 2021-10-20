@@ -18,6 +18,5 @@ func NewSetVariablesManager(mngrCtx *types.Context, flow *types.Flow) (*SetVaria
 	return &item
 }
 func (man *SetVariablesManager) StartProcessing() {
-	log := man.ManagerContext.Log
-	log.Debug( "Creating playback... ")
+	//log := man.ManagerContext.Log
 }

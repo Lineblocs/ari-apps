@@ -17,7 +17,7 @@ type Context struct {
  	Log log15.Logger
  	Context context.Context
 	 Client ari.Client
-	RecvChannel chan<- Link
+	RecvChannel chan<- *ManagerResponse
 }
 
 func convertVariableValues(value string, lineFlow *Flow) (string) {
@@ -25,7 +25,8 @@ func convertVariableValues(value string, lineFlow *Flow) (string) {
 	out := rex.FindAllStringSubmatch(value, -1)
 
     for _, i := range out {
-		match := i[1]
+        fmt.Println(i)
+		match := i[0]
         fmt.Println(match)
 		rex1 := regexp.MustCompile("^\\{\\{|\\}\\}$")
 		updated := strings.Split(rex1.ReplaceAllString(match, ""), ".")
@@ -69,7 +70,7 @@ func processAllInterpolations( data map[string] ModelData, lineFlow *Flow) {
 		processInterpolation(&val, lineFlow)
 	}
 }
-func NewContext(cl ari.Client, ctx context.Context, recvChannel chan<- Link,log *log15.Logger, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) (*Context) {
+func NewContext(cl ari.Client, ctx context.Context, recvChannel chan<- *ManagerResponse,log *log15.Logger, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) (*Context) {
 	processAllInterpolations( cell.Model.Data, flow );
 	return &Context{Client: cl, Log: *log, Context: ctx, Channel: channel, Cell: cell, Flow: flow, Runner: runner, RecvChannel: recvChannel};
 }

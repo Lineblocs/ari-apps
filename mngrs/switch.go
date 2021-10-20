@@ -21,9 +21,9 @@ func NewSwitchManager(mngrCtx *types.Context, flow *types.Flow) (*SwitchManager)
 }
 func (man *SwitchManager) StartProcessing() {
 	log := man.ManagerContext.Log
-	log.Debug( "Creating playback... ")
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
+	channel := man.ManagerContext.Channel
 	//ctx := man.ManagerContext.Context
 	data := cell.Model.Data
 	links := cell.Model.Links
@@ -74,7 +74,11 @@ func (man *SwitchManager) StartProcessing() {
 
 		for _, item := range sourceLinks {
 			if item.Target.Model.Name == matched.Cell {
-				man.ManagerContext.RecvChannel <- *item
+
+				resp := types.ManagerResponse{
+					Channel: channel,
+					Link: item }
+				man.ManagerContext.RecvChannel <- &resp
 			}
 		}
 	}

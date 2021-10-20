@@ -17,7 +17,8 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 	}
 	log.Debug("source link count: " + strconv.Itoa( len( cell.SourceLinks )))
 	log.Debug("target link count: " + strconv.Itoa( len( cell.TargetLinks )))
-	manRecvChannel := make(chan types.Link)	
+
+	manRecvChannel := make(chan *types.ManagerResponse)	
 	lineCtx := types.NewContext(
 		cl,
 		ctx,
@@ -58,7 +59,7 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 	}
 	for {
 		select {
-			case next, ok := <-manRecvChannel:
+			case resp, ok := <-manRecvChannel:
 				if !ok {
 					log.Debug("error receiving result from cell..")
 					return
@@ -66,7 +67,14 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 				log.Debug("ended process for cell")
 				log.Debug("moving to next..")
 
-				startProcessingFlow( cl, ctx, flow, lineChannel, eventVars, next.Target, runner)
+
+				if resp.Link == nil {
+					log.Debug("no target found... hanging up")
+					utils.SafeHangup( resp.Channel )
+					return
+				}
+				next := resp.Link
+				startProcessingFlow( cl, ctx, flow, resp.Channel, eventVars, next.Target, runner)
 		}
 	}
 }

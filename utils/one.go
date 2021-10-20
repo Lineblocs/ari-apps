@@ -45,14 +45,17 @@ func CheckFreeTrial( plan string ) bool {
 func FindLinkByName( links []*types.Link, direction string, tag string) (*types.Link, error) {
 		fmt.Println("FindLinkByName called...")
 	for _, link := range links {
-		fmt.Println("FindLinkByName checking source port: " + link.Target.Cell.Source.Port)
-		fmt.Println("FindLinkByName checking target port: " + link.Target.Cell.Target.Port)
+		fmt.Println("FindLinkByName checking source port: " + link.Link.Source.Port)
+		fmt.Println("FindLinkByName checking target port: " + link.Link.Target.Port)
 		if direction == "source" {
-			if link.Source.Cell.Source.Port == tag {
+			fmt.Println("FindLinkByName checking link: " + link.Source.Cell.Name)
+			if link.Link.Source.Port == tag {
 				return link, nil
 			}
 		} else if direction == "target" {
-			if link.Target.Cell.Target.Port == tag {
+
+			fmt.Println("FindLinkByName checking link: " + link.Target.Cell.Name)
+			if link.Link.Target.Port == tag {
 				return link, nil
 			}
 		}
@@ -365,4 +368,7 @@ func ParseRingTimeout( value string ) (int) {
 	}
 	return result
 
+}
+
+func SafeSendResonseToChannel(channel chan<- *types.ManagerResponse, resp *types.ManagerResponse) {
 }
