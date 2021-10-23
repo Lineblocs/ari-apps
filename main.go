@@ -17,6 +17,7 @@ import (
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/CyCoreSystems/ari/v5/client/native"
 	"github.com/CyCoreSystems/ari/v5/rid"
+	"lineblocs.com/processor/grpc"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 	"lineblocs.com/processor/logger"
@@ -317,6 +318,9 @@ func main() {
 	log.Info("Connected to ARI")
 
 	defer cl.Close()
+
+	log.Info("starting GRPC listener...")
+	go grpc.StartListener()
 	// setup app
 
 	log.Info("Starting listener app")
@@ -532,6 +536,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 			Channel: h }
 		user := types.NewUser(data.CreatorId, data.WorkspaceId, data.WorkspaceName)
 		flow := types.NewFlow(
+			data.FlowId,
 			user,
 			&flowJson,
 			&lineChannel, 

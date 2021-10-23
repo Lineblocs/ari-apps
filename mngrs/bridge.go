@@ -363,6 +363,8 @@ func (man *BridgeManager) StartProcessing() {
 		man.initiateExtFlow(user, extension)
 	} else if callType.ValueStr == "Follow Me" {
 	} else if callType.ValueStr == "Queue" {
+	} else if callType.ValueStr == "Merge Calls" {
+		man.startCallMerge(callType.ValueStr)
 	}
 
 
@@ -387,13 +389,15 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 	channel := ctx.Channel
 	client := ctx.Client
 
-	info, err := api.GetExtensionFlowInfo(strconv.Itoa(workspace), extension)
+	subFlow, err := api.GetExtensionFlowInfo(strconv.Itoa(workspace), extension)
 	if err != nil {
 		log.Debug("error starting new flow: " + err.Error())
 		return
 	}
+	info := subFlow.Vars
 	//user := types.NewUser(data.CreatorId, data.WorkspaceId, data.WorkspaceName)
 	flow := types.NewFlow(
+		subFlow.FlowId,	
 		user,
 		info,
 		channel, 
@@ -410,4 +414,33 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 	}
 	*/
 
+}
+
+func (man *BridgeManager) startCallMerge(callType string) {
+	ctx := man.ManagerContext
+	log := man.ManagerContext.Log
+	log.Debug("Starting call merge")
+
+	flow := ctx.Flow
+	id := flow.FlowId
+	cell := ctx.Cell
+	bridgeKey := "bridge-" + cell.Cell.Name + "-" + strconv.Itoa( id ) 
+	key := ari.NewKey(ari.BridgeKey, bridgeKey)
+	bridge, err := ctx.Client.Bridge().Create(key, "mixing", key.ID)
+	if err != nil {
+		bridge = nil
+		log.Debug("failed to create bridge")
+		return
+	}
+
+	lineBridge := types.NewBridge(bridge)
+	log.Info("channel added to bridge")
+
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go man.manageBridge(lineBridge, wg, callType)
+	wg.Wait()
+
+
+	man.addAllRequestedCalls(lineBridge);
 }

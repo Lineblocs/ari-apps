@@ -55,7 +55,17 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 		case "devs.WaitModel":
 			mngr := NewWaitManager(lineCtx, flow)
 			mngr.StartProcessing()
+		case "devs.SendDigitsModel":
+			mngr := NewSendDigitsManager(lineCtx, flow)
+			mngr.StartProcessing()
+		case "devs.MacroModel":
+			mngr := NewMacroManager(lineCtx, flow)
+			mngr.StartProcessing()
+		case "devs.ConferenceModel":
+			mngr := NewConferenceManager(lineCtx, flow)
+			mngr.StartProcessing()
 		default:
+
 	}
 
 	log.Debug("waiting to receive from channel...")

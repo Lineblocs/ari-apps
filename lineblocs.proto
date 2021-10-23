@@ -1,0 +1,261 @@
+syntax = "proto3";
+package grpc;
+option go_package = "./";
+
+// The greeting service definition.
+service Lineblocs {
+
+// general purpose
+  rpc createBridge (BridgeRequest) returns (BridgeReply) {}
+  rpc createCall (CallRequest) returns (CallReply) {}
+  rpc addChannel (ChannelRequest) returns (ChannelReply) {}
+  rpc playRecording (RecordingPlayRequest) returns (RecordingPlayReply) {}
+  rpc getChannel (ChannelFetchRequest) returns (ChannelFetchReply) {}
+  rpc createConference (ConferenceRequest) returns (ConferenceReply) {}
+
+
+// channel functions
+  rpc channel_getBridge (ChannelGetBridgeRequest) returns (ChannelGetBridgeReply) {}
+  rpc channel_removeFromBridge (ChannelRemoveBridgeRequest) returns (ChannelRemoveBridgeReply) {}
+  rpc channel_playTTS (ChannelTTSRequest) returns (ChannelTTSReply) {}
+  rpc channel_startAcceptingInput (ChannelInputRequest) returns (ChannelInputReply) {}
+  rpc channel_removeDTMFListeners (ChannelRemoveDTMFRequest) returns (ChannelRemoveDTMFReply) {}
+  rpc channel_automateCallHangup (GenericChannelReq) returns (GenericChannelResp) {}
+  rpc channel_gotoFlowWidget (
+	ChannelFlowWidgetRequest) returns (ChannelFlowWidgetReply) {}
+  rpc channel_startRinging (GenericChannelReq) returns (GenericChannelReq) {}
+  rpc channel_stopRinging (GenericChannelReq) returns (GenericChannelResp) {}
+
+// bridge functions
+  rpc bridge_addChannel (BridgeChannelRequest) returns (BridgeChannelReply) {}
+  rpc bridge_addChannels (BridgeChannelsRequest) returns (BridgeChannelsReply) {}
+  rpc bridge_playTTS (BridgeTTSRequest) returns (BridgeTTSReply) {}
+  rpc bridge_automateLegAHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
+  rpc bridge_automateLegBHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
+  rpc bridge_attachEventListener (BridgeEventRequest) returns (BridgeEventReply) {}
+
+
+// recording functions
+  rpc recording_deleteRecording (RecordingDeleteRequest) returns (RecordingDeleteReply) {}
+  rpc recording_addRecordingTag (RecordingTagRequest) returns (RecordingTagReply) {}
+  rpc recording_deleteRecordingTag (RecordingTagDeleteRequest) returns (RecordingTagDeleteReply) {}
+
+  rpc session_listRecordings (SessionRecordingsRequest) returns (SessionRecordingsReply) {}
+
+// conference functions
+  rpc conference_addWaitingParticipant (ConferenceParticipantRequest) returns (ConferenceParticipantReply) {}
+  rpc conference_addParticipant (ConferenceParticipantRequest) returns (ConferenceParticipantReply) {}
+  rpc conference_setModeratorInConf (ConferenceModeratorRequest) returns (ConferenceModeratorReply) {}
+  rpc conference_attachEventListener (ConferenceEventRequest) returns (ConferenceEventReply) {}
+}
+
+message BridgeRequest {
+  bool hangup = 1;
+}
+
+message BridgeReply {
+}
+
+
+message CallRequest {
+  int32 flow_id = 1;
+  int32 call_id = 2;
+  int32 caller_id = 3;
+  int32 call_type = 4;
+}
+
+message CallReply {
+}
+
+message ChannelRequest {
+  int32 channel_id = 1;
+}
+
+message ChannelReply {
+}
+
+message RecordingPlayRequest {
+	int32 flow_id = 1;
+	int32 channel_id = 2;
+	string file_uri = 3;
+}
+
+message RecordingPlayReply {
+}
+
+message Channel {
+	string channel_id = 1;
+}
+
+message ChannelFetchRequest {
+	string channel_id = 1;
+}
+
+message ChannelFetchReply {
+	Channel channel = 1;
+}
+
+message ConferenceRequest {
+	string name = 1;
+}
+
+message ConferenceReply {
+}
+
+message ChannelGetBridgeRequest {
+	string channel_id = 1;
+}
+
+message ChannelGetBridgeReply {
+}
+
+message ChannelRemoveBridgeRequest {
+	string channel_id = 1;
+}
+
+message ChannelRemoveBridgeReply {
+}
+
+message ChannelTTSRequest {
+	string text = 1;
+	string gender = 2;
+	string voice = 3;
+	string language = 4;
+}
+
+message ChannelTTSReply {
+}
+
+message ChannelInputRequest {
+	string channel_id = 1;
+}
+
+message ChannelInputReply {
+}
+
+message ChannelRemoveDTMFRequest {
+	string channel_id = 1;
+}
+message ChannelRemoveDTMFReply {
+	string channel_id = 1;
+}
+
+message GenericChannelReq {
+	string channel_id = 1;
+}
+message GenericChannelResp {
+	string channel_id = 1;
+}
+
+message ChannelFlowWidgetRequest {
+	string channel_id = 1;
+	string widget = 2;
+	map<string, string> event_vars =3;
+}
+
+message ChannelFlowWidgetReply {
+
+}
+
+message BridgeChannelRequest {
+	string bridge_id = 1;
+	string channel_id = 2;
+}
+
+message BridgeChannelReply {
+}
+
+
+message BridgeChannelsRequest {
+	string bridge_id = 1;
+	repeated string channel_id = 2;
+}
+
+message BridgeChannelsReply {
+}
+
+message BridgeTTSRequest {
+	string text = 1;
+	string gender = 2;
+	string voice = 3;
+	string language = 4;
+}
+
+
+message BridgeTTSReply {
+}
+
+message BridgeAutomateLegRequest {
+	string bridge_id = 1;
+	string channel_id = 2;
+}
+
+message BridgeAutomateLegReply {
+}
+
+message BridgeEventRequest {
+	string bridge_id = 1;
+	string inline_code = 2;
+}
+message BridgeEventReply {
+}
+
+message RecordingDeleteRequest {
+	int32 recording_id = 1;
+}
+
+message RecordingDeleteReply {
+}
+
+message RecordingTagRequest {
+	int32 recording_id = 1;
+	string key = 2;
+	string value = 3;
+}
+message RecordingTagReply {
+}
+
+message RecordingTagDeleteRequest {
+	int32 recording_id = 1;
+	string key = 2;
+}
+message RecordingTagDeleteReply {
+}
+
+message Recording {
+	int32 recording_id = 1;
+	string file_uri = 2;
+}
+message SessionRecordingsRequest {
+}
+
+message SessionRecordingsReply {
+	repeated Recording recordings = 1;
+}
+
+message Participant {
+	string channel_id = 1;
+	string role = 2;
+	string moh = 3;
+}
+message ConferenceParticipantRequest {
+	string conf_id = 1;
+	repeated Participant participants = 2;
+}
+
+message ConferenceParticipantReply {
+}
+message ConferenceModeratorRequest {
+	string conf_id = 1;
+	bool value = 2;
+}
+message ConferenceModeratorReply {
+}
+
+message ConferenceEventRequest {
+	string conf_id = 1;
+	string inline_code = 2;
+}
+
+message ConferenceEventReply {
+}

@@ -80,6 +80,7 @@ type FlowVars struct {
 
 type FlowDIDData struct {
 	//FlowJson FlowVars `json:"flow_json"`
+	FlowId int `json:"flow_id"`
 	WorkspaceId int `json:"workspace_id"`
 	WorkspaceName string `json:"workspace_name"`
 	CreatorId int `json:"creator_id"`
@@ -197,8 +198,8 @@ func addCellToFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 	createCellData(cellInFlow, flow, channel)
 	return cellInFlow
 }
-func NewFlow(user *User, vars *FlowVars, channel *LineChannel, client ari.Client) (*Flow) {
-	flow := &Flow{User: user, Vars: vars, Runners: make([]*Runner, 0)}
+func NewFlow(id int, user *User, vars *FlowVars, channel *LineChannel, client ari.Client) (*Flow) {
+	flow := &Flow{FlowId: id, User: user, Vars: vars, Runners: make([]*Runner, 0)}
 	fmt.Printf("number of cells %d\r\n", len(flow.Vars.Graph.Cells))
 	// create cells from flow.Vars
 	for _, cell := range flow.Vars.Graph.Cells {
@@ -224,6 +225,7 @@ type Flow struct {
 	Models []*Model
 	Runners []*Runner
 	Vars *FlowVars
+	FlowId int
 }
 
 type Runner struct {

@@ -29,8 +29,16 @@ type DomainResponse struct {
 	WorkspaceName string `json:"workspace_name"`
 }
 type FlowResponse struct {
+	FlowId int `json:"flow_id"`
 	FlowJson string `json:"flow_json"`
 }
+
+type SubFlow struct {
+	Vars *types.FlowVars
+	FlowId int `json:"flow_id"`
+}
+
+
 
 type CallResponse struct {
   From string `json:"from"`
@@ -227,7 +235,7 @@ func GetCallerId( domain string, extension string ) (*CallerIdResponse, error) {
 }
 
 
-func GetExtensionFlowInfo(workspace string, extension string) (*types.FlowVars, error) {
+func GetExtensionFlowInfo(workspace string, extension string) (*SubFlow, error) {
 	params := make( map[string]string )
 	fmt.Println("looking up caller id for: " + extension)
 	params["workspace"] = workspace
@@ -238,6 +246,7 @@ func GetExtensionFlowInfo(workspace string, extension string) (*types.FlowVars, 
 	}
 
 
+	var subFlow SubFlow
 	var data FlowResponse
 	var flowJson types.FlowVars
 	err = json.Unmarshal( []byte(res), &data )
@@ -246,13 +255,17 @@ func GetExtensionFlowInfo(workspace string, extension string) (*types.FlowVars, 
 		return nil, err
 	}
 
+	subFlow = SubFlow{ FlowId: data.FlowId }
+
 	err = json.Unmarshal( []byte(data.FlowJson), &flowJson )
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
 
-	return &flowJson, nil
+	subFlow.Vars = &flowJson
+
+	return &subFlow, nil
 }
 
 func FetchCall(callId string) (*CallResponse, error) {
