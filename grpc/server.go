@@ -63,6 +63,7 @@ func (s *Server) startProcessingBridge( bridge *types.LineBridge, clientId strin
 				fmt.Println("channel entered subscription closed")
 				return
 			}
+			fmt.Println("channel joined bridge!!")
 			v := e.(*ari.ChannelEnteredBridge)
 			channelId := v.Channel.ID
 			s.dispatchEvent(func() {
@@ -101,6 +102,14 @@ func (s *Server) startProcessingBridge( bridge *types.LineBridge, clientId strin
 	}
 }
 
+func (s *Server) addBridgeChannel( bridge *types.LineBridge, channel *types.LineChannel ) (error) {
+	err := bridge.Bridge.AddChannel(channel.Channel.Key().ID)
+	if err != nil {
+		return err
+	}
+	utils.AddChannelToBridge(bridge, channel)
+	return nil
+}
 
 func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, clientId string, ringTimeoutChan chan<- bool) () {
 	h := callChannel.Channel
@@ -184,7 +193,7 @@ func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, c
 	}
 }
 
-func (s *Server) managePrompt(playback *ari.PlaybackHandle, channel *types.LineChannel, clientId string) {
+func (s *Server) managePrompt(playback *ari.PlaybackHandle, clientId string) {
 	finishedSub := playback.Subscribe(ari.Events.PlaybackFinished)
 	defer finishedSub.Cancel()
 
@@ -388,14 +397,94 @@ func (*Server) PlayRecording(context.Context, *RecordingPlayRequest) (*Recording
 func (*Server) GetChannel(context.Context, *ChannelFetchRequest) (*ChannelFetchReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChannel not implemented")
 }
-func (*Server) CreateConference(context.Context, *ConferenceRequest) (*ConferenceReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateConference not implemented")
+func (s *Server) CreateConference(ctx context.Context, req *ConferenceRequest) (*ConferenceReply, error) {
+	fmt.Println("creating conf!!!");
+	//var bridge *ari.BridgeHandle 
+	var err error
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	workspaceId := headers["workspaceid"][0]
+	userId := headers["userid"][0]
+	domain := headers["domain"][0]
+	fmt.Println("client ID = " + clientId)
+	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
+	userIdInt, err := strconv.Atoi( userId )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+	workspace, err := strconv.Atoi( workspaceId )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+
+	user := types.NewUser(userIdInt, workspace, workspaceName)
+	resp, err := api.CreateConference( workspace, req.Name)
+	if err != nil {
+		return nil,err
+	}
+
+	src := ari.NewKey(ari.ChannelKey, "123")
+	key := src.New(ari.BridgeKey, rid.New(rid.Bridge))
+	bridge, err := s.Client.Bridge().Create(key, "mixing", key.ID)
+	if err != nil {
+		return nil, err
+	}
+
+
+	conf := types.NewConference(resp.Id, user, &types.LineBridge{Bridge:bridge})
+
+
+	utils.AddConfBridge( s.Client, workspaceId, req.Name, conf )
+
+	reply := ConferenceReply{
+		ConfId: conf.Id,
+		BridgeId: conf.Bridge.Bridge.ID() }
+
+	s.dispatchEvent(func() {
+		// send to channel
+		data := make(map[string]string)
+		data["conf_id"] = resp.Id
+		evt:= ClientEvent{
+			ClientId: clientId,
+			Type: "conference_ConfCreated",
+			Data: data }
+			fmt.Println("sending client event..")
+		s.WsChan <- &evt
+	})
+	return &reply, nil
 }
 func (*Server) ChannelGetBridge(context.Context, *ChannelGetBridgeRequest) (*ChannelGetBridgeReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ChannelGetBridge not implemented")
 }
-func (*Server) ChannelRemoveFromBridge(context.Context, *ChannelRemoveBridgeRequest) (*ChannelRemoveBridgeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ChannelRemoveFromBridge not implemented")
+func (s *Server) ChannelRemoveFromBridge(ctx context.Context, req *ChannelRemoveBridgeRequest) (*ChannelRemoveBridgeReply, error) {
+	fmt.Println("adding channel to bridge!!!");
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	fmt.Println("client ID = " + clientId)
+	bridge, err := s.lookupBridge( req.BridgeId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	channel, err := s.lookupChannel( req.ChannelId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	err = bridge.Bridge.RemoveChannel( channel.Channel.ID() )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to remove channel from bridge")
+	}
+	resp := ChannelRemoveBridgeReply{}
+	return &resp, nil
 }
 func (s *Server) ChannelPlayTTS(ctx context.Context, req *ChannelTTSRequest) (*ChannelTTSReply, error) {
 	headers, ok := metadata.FromIncomingContext(ctx)
@@ -431,7 +520,7 @@ func (s *Server) ChannelPlayTTS(ctx context.Context, req *ChannelTTSRequest) (*C
 		return nil, err
 	}
 
-	go s.managePrompt( playback, channel, clientId )
+	go s.managePrompt( playback, clientId )
 	reply := ChannelTTSReply{
 		PlaybackId: key.ID }
 	return &reply, nil
@@ -439,8 +528,22 @@ func (s *Server) ChannelPlayTTS(ctx context.Context, req *ChannelTTSRequest) (*C
 func (*Server) ChannelStartAcceptingInput(context.Context, *ChannelInputRequest) (*ChannelInputReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ChannelStartAcceptingInput not implemented")
 }
-func (*Server) ChannelRemoveDTMFListeners(context.Context, *ChannelRemoveDTMFRequest) (*ChannelRemoveDTMFReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ChannelRemoveDTMFListeners not implemented")
+func (s *Server) ChannelRemoveDTMFListeners(ctx context.Context, req *ChannelRemoveDTMFRequest) (*ChannelRemoveDTMFReply, error) {
+	fmt.Println("remove DTMF listeners")
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	fmt.Println("client ID = " + clientId)
+	channel, err := s.lookupChannel( req.ChannelId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	channel.Channel.Unsubscribe(ari.Events.ChannelDtmfReceived)
+	resp := ChannelRemoveDTMFReply{}
+	return &resp, nil
 }
 func (*Server) ChannelAutomateCallHangup(context.Context, *GenericChannelReq) (*GenericChannelResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ChannelAutomateCallHangup not implemented")
@@ -514,11 +617,39 @@ func (s *Server) ChannelStartFlow(ctx context.Context, req *ChannelStartFlowWidg
 	resp := ChannelStartFlowWidgetReply{}
 	return &resp, nil
 }
-func (*Server) ChannelStartRinging(context.Context, *GenericChannelReq) (*GenericChannelReq, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ChannelStartRinging not implemented")
+func (s *Server) ChannelStartRinging(ctx context.Context, req *GenericChannelReq) (*GenericChannelResp, error) {
+	fmt.Println("remove DTMF listeners")
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	fmt.Println("client ID = " + clientId)
+	channel, err := s.lookupChannel( req.ChannelId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	channel.Channel.Ring()
+	resp := GenericChannelResp{}
+	return &resp, nil
 }
-func (*Server) ChannelStopRinging(context.Context, *GenericChannelReq) (*GenericChannelResp, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ChannelStopRinging not implemented")
+func (s *Server) ChannelStopRinging(ctx context.Context, req *GenericChannelReq) (*GenericChannelResp, error) {
+	fmt.Println("remove DTMF listeners")
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	fmt.Println("client ID = " + clientId)
+	channel, err := s.lookupChannel( req.ChannelId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	channel.Channel.StopRing()
+	resp := GenericChannelResp{}
+	return &resp, nil
 }
 func (s *Server) BridgeAddChannel(ctx context.Context, req *BridgeChannelRequest) (*BridgeChannelReply, error) {
 	fmt.Println("adding channel to bridge!!!");
@@ -537,7 +668,9 @@ func (s *Server) BridgeAddChannel(ctx context.Context, req *BridgeChannelRequest
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
-	utils.AddChannelToBridge(bridge, channel)
+	fmt.Println("adding channel now!!!");
+
+	s.addBridgeChannel( bridge, channel )
 	reply := BridgeChannelReply{}
 	return &reply, nil
 }
@@ -561,13 +694,49 @@ func (s *Server) BridgeAddChannels(ctx context.Context, req *BridgeChannelsReque
 		if err != nil {
 			return nil, eris.Wrap(err, "failed to add channel to bridge")
 		}
-		utils.AddChannelToBridge(bridge, channel)
+		s.addBridgeChannel( bridge, channel )
 	}
 	reply := BridgeChannelsReply{}
 	return &reply, nil
 }
-func (*Server) BridgePlayTTS(context.Context, *BridgeTTSRequest) (*BridgeTTSReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BridgePlayTTS not implemented")
+func (s *Server) BridgePlayTTS(ctx context.Context, req *BridgeTTSRequest) (*BridgeTTSReply, error) {
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+
+	fmt.Println("client ID = " + clientId)
+	fmt.Println("lookup bridge  = " + req.BridgeId)
+	bridge, err := s.lookupBridge( req.BridgeId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	file, err := utils.StartTTS(req.Text, req.Gender, req.Voice, req.Language)
+	if err != nil {
+		fmt.Println("error downloading: " + err.Error())
+		return nil, err
+	}
+
+	uniq, err := uuid.NewUUID()
+	if err != nil {
+		fmt.Println("error creating UUID: " + err.Error())
+		return nil, err
+	}
+	key := ari.NewKey(ari.PlaybackKey, uniq.String())
+	uri := "sound:" + file
+	playback, err := bridge.Bridge.Play(key.ID, uri)
+	//playback, err := channel.Channel.Play(channel.Channel.Key().ID, uri)
+	if err != nil {
+		fmt.Println("failed to play join sound. err: " + err.Error())
+		return nil, err
+	}
+
+	go s.managePrompt( playback, clientId )
+	reply := BridgeTTSReply{
+		PlaybackId: key.ID }
+	return &reply, nil
 }
 func (*Server) BridgeAutomateLegAHangup(context.Context, *BridgeAutomateLegRequest) (*BridgeAutomateLegReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BridgeAutomateLegAHangup not implemented")

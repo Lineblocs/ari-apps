@@ -37,7 +37,10 @@ type SubFlow struct {
 	Vars *types.FlowVars
 	FlowId int `json:"flow_id"`
 }
-
+type ConfParams struct {
+	Name string `json:"name"`
+	WorkspaceId int `json:"workspace_id"`	
+}
 
 
 type CallResponse struct {
@@ -55,6 +58,9 @@ type CallResponse struct {
   CreatedAt string `json:"created_at"`
   UpdatedAt string `json:"updated_at"`
   PlanSnapshot string `json:"plan_snapshot"`
+}
+type ConferenceResponse struct {
+	Id string `json:"id"`
 }
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     url := "https://internals.lineblocs.com" + path
@@ -318,4 +324,23 @@ func FetchCall(callId string) (*CallResponse, error) {
 	}
 
 	return &data, nil
+}
+func CreateConference(workspaceId int, name string) (*ConferenceResponse, error) {
+	fmt.Println("creating conference...")
+	params := ConfParams{
+		Name: name,
+		WorkspaceId: workspaceId }
+	body, err := json.Marshal( params )
+
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := SendHttpRequest( "/conference/createConference", body)
+	if err != nil {
+		return nil, err
+	}
+
+	id := resp.Headers.Get("x-conference-id")
+	return &ConferenceResponse{Id: id}, nil
 }

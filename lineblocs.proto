@@ -23,7 +23,7 @@ service Lineblocs {
   rpc channel_automateCallHangup (GenericChannelReq) returns (GenericChannelResp) {}
   rpc channel_gotoFlowWidget (ChannelFlowWidgetRequest) returns (ChannelFlowWidgetReply) {}
   rpc channel_startFlow (ChannelStartFlowWidgetRequest) returns (ChannelStartFlowWidgetReply) {}
-  rpc channel_startRinging (GenericChannelReq) returns (GenericChannelReq) {}
+  rpc channel_startRinging (GenericChannelReq) returns (GenericChannelResp) {}
   rpc channel_stopRinging (GenericChannelReq) returns (GenericChannelResp) {}
 
 // bridge functions
@@ -33,14 +33,6 @@ service Lineblocs {
   rpc bridge_automateLegAHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
   rpc bridge_automateLegBHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
   rpc bridge_attachEventListener (BridgeEventRequest) returns (BridgeEventReply) {}
-
-
-// recording functions
-  rpc recording_deleteRecording (RecordingDeleteRequest) returns (RecordingDeleteReply) {}
-  rpc recording_addRecordingTag (RecordingTagRequest) returns (RecordingTagReply) {}
-  rpc recording_deleteRecordingTag (RecordingTagDeleteRequest) returns (RecordingTagDeleteReply) {}
-
-  rpc session_listRecordings (SessionRecordingsRequest) returns (SessionRecordingsReply) {}
 
 // conference functions
   rpc conference_addWaitingParticipant (ConferenceParticipantRequest) returns (ConferenceParticipantReply) {}
@@ -106,6 +98,8 @@ message ConferenceRequest {
 }
 
 message ConferenceReply {
+	string conf_id = 1;
+	string bridge_id = 2;
 }
 
 message ChannelGetBridgeRequest {
@@ -117,6 +111,7 @@ message ChannelGetBridgeReply {
 
 message ChannelRemoveBridgeRequest {
 	string channel_id = 1;
+	string bridge_id = 2;
 }
 
 message ChannelRemoveBridgeReply {
@@ -197,6 +192,7 @@ message BridgeTTSRequest {
 	string gender = 2;
 	string voice = 3;
 	string language = 4;
+	string bridge_id = 5;
 }
 
 

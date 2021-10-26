@@ -8,6 +8,7 @@ import (
 	"strings"
 	"io/ioutil"
 	"net/http"
+	"encoding/json"
 	"os"
 	"io"
 	"fmt"
@@ -20,13 +21,18 @@ import (
 	    "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/session"
 	    "github.com/aws/aws-sdk-go/service/s3/s3manager"
+		    "github.com/go-redis/redis/v8"
 	        texttospeech "cloud.google.com/go/texttospeech/apiv1"
         texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
 )
 
 
 var log log15.Logger
-
+type ConfCache struct {
+	Id string `json:"id"`	
+	BridgeId string `json:"bridgeId"`	
+	UserInfo *types.UserInfo `json:"userInfo"`	
+}
 // TODO get the ip
 func GetPublicIp( ) string {
 	return "0.0.0.0"
@@ -44,6 +50,15 @@ func CheckFreeTrial( plan string ) bool {
 		return true
 	}
 	return false
+}
+
+func CreateRDB() (*redis.Client) {
+    rdb := redis.NewClient(&redis.Options{
+        Addr:     "localhost:6379",
+        Password: "", // no password set
+        DB:       0,  // use default DB
+    })
+	return rdb
 }
 
 func FindLinkByName( links []*types.Link, direction string, tag string) (*types.Link, error) {
@@ -419,4 +434,48 @@ func SafeSendResonseToChannel(channel chan<- *types.ManagerResponse, resp *types
 func GetWorkspaceNameFromDomain(domain string) (string) {
 	s := strings.Split(domain, ".")
 	return s[0]
+}
+
+
+func AddConfBridge( client ari.Client, workspace string, confName string, conf *types.LineConference ) (*types.LineConference, error) {
+	var ctx = context.Background()
+ 	key := workspace + "_" + confName
+	rdb := CreateRDB()
+	params := ConfCache{
+		Id: conf.Id,
+		UserInfo: &conf.User.Info,
+		BridgeId:  conf.Bridge.Bridge.ID() }
+	body, err := json.Marshal( params )
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return nil, err
+	}
+
+    err = rdb.Set(ctx, key, body, 0).Err()
+    if err != nil {
+		return nil, err
+    }
+
+	return conf, nil
+}
+
+
+func GetConfBridge( client ari.Client, user *types.User, confName string ) (*types.LineConference, error) {
+	var ctx = context.Background()
+ 	key := strconv.Itoa( user.Workspace.Id ) + "_" + confName
+	rdb := CreateRDB()
+    val, err := rdb.Get(ctx, key).Result()
+    if err != nil {
+		return nil, err
+    }
+    fmt.Println("key", val)
+	var data ConfCache
+	err = json.Unmarshal( []byte(val), &data )
+    if err != nil {
+		return nil, err
+	}
+	src := ari.NewKey(ari.BridgeKey, data.BridgeId)
+	bridge := client.Bridge().Get(src)
+	conf := types.NewConference(data.Id, user, &types.LineBridge{ Bridge: bridge })
+	return conf, nil
 }
