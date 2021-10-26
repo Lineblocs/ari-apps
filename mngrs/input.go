@@ -57,8 +57,7 @@ func (man *InputManager) StartProcessing() {
 
 
 		log.Debug("processing TTS")
-		file, err := utils.StartTTS( flow, 
-			data["text_to_say"].ValueStr,
+		file, err := utils.StartTTS( data["text_to_say"].ValueStr,
 			data["text_gender"].ValueStr,
 			data["voice"].ValueStr,
 			data["text_language"].ValueStr,

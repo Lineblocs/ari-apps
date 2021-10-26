@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 	"context"
+	"strings"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -307,7 +308,7 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 	return link, err
 }
 
-func StartTTS(flow *types.Flow, say string, gender string, voice string, lang string) (string, error) {
+func StartTTS(say string, gender string, voice string, lang string) (string, error) {
 	// Instantiates a client.
 	ctx := context.Background()
 
@@ -413,4 +414,9 @@ func ParseRingTimeout( value string ) (int) {
 }
 
 func SafeSendResonseToChannel(channel chan<- *types.ManagerResponse, resp *types.ManagerResponse) {
+}
+
+func GetWorkspaceNameFromDomain(domain string) (string) {
+	s := strings.Split(domain, ".")
+	return s[0]
 }

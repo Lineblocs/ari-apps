@@ -388,6 +388,7 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 	workspace := user.Workspace.Id
 	channel := ctx.Channel
 	client := ctx.Client
+	coreFlow := ctx.Flow
 
 	subFlow, err := api.GetExtensionFlowInfo(strconv.Itoa(workspace), extension)
 	if err != nil {
@@ -401,6 +402,7 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 		user,
 		info,
 		channel, 
+		coreFlow.WorkspaceFns,
 		client)
 
 	vars := make( map[string] string )

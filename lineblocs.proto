@@ -21,8 +21,8 @@ service Lineblocs {
   rpc channel_startAcceptingInput (ChannelInputRequest) returns (ChannelInputReply) {}
   rpc channel_removeDTMFListeners (ChannelRemoveDTMFRequest) returns (ChannelRemoveDTMFReply) {}
   rpc channel_automateCallHangup (GenericChannelReq) returns (GenericChannelResp) {}
-  rpc channel_gotoFlowWidget (
-	ChannelFlowWidgetRequest) returns (ChannelFlowWidgetReply) {}
+  rpc channel_gotoFlowWidget (ChannelFlowWidgetRequest) returns (ChannelFlowWidgetReply) {}
+  rpc channel_startFlow (ChannelStartFlowWidgetRequest) returns (ChannelStartFlowWidgetReply) {}
   rpc channel_startRinging (GenericChannelReq) returns (GenericChannelReq) {}
   rpc channel_stopRinging (GenericChannelReq) returns (GenericChannelResp) {}
 
@@ -51,20 +51,26 @@ service Lineblocs {
 
 message BridgeRequest {
   bool hangup = 1;
+  string client_id = 2;
 }
 
 message BridgeReply {
+	string bridge_id = 1;
 }
 
 
 message CallRequest {
-  int32 flow_id = 1;
-  int32 call_id = 2;
-  int32 caller_id = 3;
-  int32 call_type = 4;
+  string flow_id = 1;
+  string call_id = 2;
+  string caller_id = 3;
+  string call_type = 4;
+  string destination = 5;
+  string timeout = 6;
 }
 
 message CallReply {
+	string call_id = 1;
+	string channel_id = 2;
 }
 
 message ChannelRequest {
@@ -121,9 +127,11 @@ message ChannelTTSRequest {
 	string gender = 2;
 	string voice = 3;
 	string language = 4;
+	string channel_id = 5;
 }
 
 message ChannelTTSReply {
+	string playback_id = 1;
 }
 
 message ChannelInputRequest {
@@ -157,6 +165,16 @@ message ChannelFlowWidgetReply {
 
 }
 
+message ChannelStartFlowWidgetRequest {
+	string channel_id = 1;
+	string flow_id = 2;
+	map<string, string> event_vars =3;
+}
+
+message ChannelStartFlowWidgetReply {
+
+}
+
 message BridgeChannelRequest {
 	string bridge_id = 1;
 	string channel_id = 2;
@@ -183,6 +201,7 @@ message BridgeTTSRequest {
 
 
 message BridgeTTSReply {
+	string playback_id = 1;
 }
 
 message BridgeAutomateLegRequest {

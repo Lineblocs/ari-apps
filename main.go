@@ -320,7 +320,11 @@ func main() {
 	defer cl.Close()
 
 	log.Info("starting GRPC listener...")
-	go grpc.StartListener()
+	go grpc.StartListener(cl)
+	err = utils.RunScriptInContext("var ttt = 1; var t1 = ttt * 2;");
+	if err != nil {
+		fmt.Println( err.Error ());
+	}
 	// setup app
 
 	log.Info("Starting listener app")
@@ -524,7 +528,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 			log.Error("startExecution err " + err.Error())
 			return
 		}
-		var macros []types.WorkspaceMacro
+		var macros []*types.WorkspaceMacro
 		err = json.Unmarshal( []byte(body), &macros)
 		if err != nil {
 			log.Error("startExecution err " + err.Error())
@@ -540,6 +544,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 			user,
 			&flowJson,
 			&lineChannel, 
+			macros,
 			cl)
 
 

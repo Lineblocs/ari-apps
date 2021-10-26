@@ -268,6 +268,38 @@ func GetExtensionFlowInfo(workspace string, extension string) (*SubFlow, error) 
 	return &subFlow, nil
 }
 
+func GetFlowInfo(workspace string, flowId string) (*SubFlow, error) {
+	params := make( map[string]string )
+	fmt.Println("looking up flow for: " + flowId)
+	params["workspace"] = workspace
+	params["flow_id"] = flowId
+	res, err := SendGetRequest("/user/getFlowInfo", params)
+	if err != nil {
+		return nil, err
+	}
+
+
+	var subFlow SubFlow
+	var data FlowResponse
+	var flowJson types.FlowVars
+	err = json.Unmarshal( []byte(res), &data )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+
+	subFlow = SubFlow{ FlowId: data.FlowId }
+
+	err = json.Unmarshal( []byte(data.FlowJson), &flowJson )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+
+	subFlow.Vars = &flowJson
+
+	return &subFlow, nil
+}
 func FetchCall(callId string) (*CallResponse, error) {
 	params := make( map[string]string )
 	fmt.Println("looking up call id: " + callId)
