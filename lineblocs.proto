@@ -25,6 +25,7 @@ service Lineblocs {
   rpc channel_startFlow (ChannelStartFlowWidgetRequest) returns (ChannelStartFlowWidgetReply) {}
   rpc channel_startRinging (GenericChannelReq) returns (GenericChannelResp) {}
   rpc channel_stopRinging (GenericChannelReq) returns (GenericChannelResp) {}
+  rpc channel_hangup(GenericChannelReq) returns (GenericChannelResp) {}
 
 // bridge functions
   rpc bridge_addChannel (BridgeChannelRequest) returns (BridgeChannelReply) {}
@@ -32,6 +33,7 @@ service Lineblocs {
   rpc bridge_playTTS (BridgeTTSRequest) returns (BridgeTTSReply) {}
   rpc bridge_automateLegAHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
   rpc bridge_automateLegBHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
+  rpc bridge_destroy (GenericBridgeReq) returns (GenericBridgeResp) {}
   rpc bridge_attachEventListener (BridgeEventRequest) returns (BridgeEventReply) {}
 
 // conference functions
@@ -49,7 +51,6 @@ message BridgeRequest {
 message BridgeReply {
 	string bridge_id = 1;
 }
-
 
 message CallRequest {
   string flow_id = 1;
@@ -195,7 +196,12 @@ message BridgeTTSRequest {
 	string bridge_id = 5;
 }
 
-
+message GenericBridgeReq {
+	string bridge_id = 1;
+}
+message GenericBridgeResp {
+	string bridge_id = 1;
+}
 message BridgeTTSReply {
 	string playback_id = 1;
 }

@@ -15,3 +15,13 @@ func NewBridge( bridge *ari.BridgeHandle ) *LineBridge {
 	value := LineBridge{Bridge: bridge, Channels: make( []*LineChannel, 0 )}
 	return &value
 }
+
+func (b *LineBridge) EndBridgeCall() {
+	for _, item := range b.Channels {
+		//log.Debug("ending call: " + item.Channel.Key().ID)
+		if item != nil {
+			item.Channel.Hangup()
+		}
+	}
+	b.Bridge.Delete()
+}

@@ -651,6 +651,23 @@ func (s *Server) ChannelStopRinging(ctx context.Context, req *GenericChannelReq)
 	resp := GenericChannelResp{}
 	return &resp, nil
 }
+func (s *Server) ChannelHangup(ctx context.Context, req *GenericChannelReq) (*GenericChannelResp, error) {
+	fmt.Println("remove DTMF listeners")
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	fmt.Println("client ID = " + clientId)
+	channel, err := s.lookupChannel( req.ChannelId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	channel.Channel.Hangup()
+	resp := GenericChannelResp{}
+	return &resp, nil
+}
 func (s *Server) BridgeAddChannel(ctx context.Context, req *BridgeChannelRequest) (*BridgeChannelReply, error) {
 	fmt.Println("adding channel to bridge!!!");
 	headers, ok := metadata.FromIncomingContext(ctx)
@@ -770,4 +787,36 @@ func (*Server) ConferenceSetModeratorInConf(context.Context, *ConferenceModerato
 }
 func (*Server) ConferenceAttachEventListener(context.Context, *ConferenceEventRequest) (*ConferenceEventReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ConferenceAttachEventListener not implemented")
+}
+
+func (s *Server) BridgeDestroy(ctx context.Context, req *GenericBridgeReq) (*GenericBridgeResp, error) {
+	fmt.Println("destroy bridge")
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	fmt.Println("client ID = " + clientId)
+	bridge, err := s.lookupBridge( req.BridgeId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+	//src := ari.NewKey(ari.BridgeKey, bridge.Bridge.ID())
+	//key := src.New(ari.BridgeKey, rid.New(rid.Bridge))
+
+	data, err := bridge.Bridge.Data()
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+	for _, id := range data.ChannelIDs {
+		channel, err := s.lookupChannel( id )
+		if err != nil {
+			//return nil, eris.Wrap(err, "failed to add channel to get channel")
+			continue
+		}
+		channel.Channel.Hangup()
+	}
+	//bridge.EndBridgeCall()
+	resp := GenericBridgeResp{}
+	return &resp, nil
 }
