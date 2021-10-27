@@ -6,6 +6,8 @@ type User struct {
 	Info UserInfo
 	Workspace Workspace
 	WorkspaceName string
+	Token string
+	Secret string
 	Domain string
 	Plan string
 }

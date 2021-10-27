@@ -5,6 +5,8 @@ import (
     //"k8s.io/client-go/kubernetes"
 	"context"
 	"strings"
+	"strconv"
+	    b64 "encoding/base64"
 	    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	//batchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
 	bv1 "k8s.io/api/batch/v1"
@@ -27,35 +29,56 @@ func NewMacroManager(mngrCtx *types.Context, flow *types.Flow) (*MacroManager) {
 		Flow: flow}
 	return &item
 }
-
-func initializeK8sAndExecute() {
+func (man *MacroManager) initializeK8sAndExecute(b64code string) (error) {
 	// creates the in-cluster config
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		panic(err.Error())
+		//panic(err.Error())
+		return err
 	}
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		//panic(err.Error())
+		return err
 	}
-	for {
-		//ctx := context.Background()
-		// get pods in all the namespaces by omitting namespace
-		// Or specify namespace to get pods in particular namespace
-		jobName := "lineblocs-runner"
-		image := "lineblocs/runner"
-		cmd := "-c BASE64"
-		err = launchK8sJob(clientset, &jobName, &image, &cmd)
-		if err != nil {
-			panic(err.Error())
-		}
+	//ctx := context.Background()
+	// get pods in all the namespaces by omitting namespace
+	// Or specify namespace to get pods in particular namespace
+	jobName := "lineblocs-runner"
+	//image := "lineblocs/runner"
+	image := "754569496111.dkr.ecr.ca-central-1.amazonaws.com/lineblocs-k8s-runner:latest"
+	cmd := "node /var/app/index.js"
+	err = man.launchK8sJob(clientset, &jobName, &image, &cmd ,&b64code)
+	if err != nil {
+		//panic(err.Error())
+		return err
 	}
+	return nil
 }
-func launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string) (error) {
+
+func (man *MacroManager) launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string, script *string) (error) {
+	ctx := man.ManagerContext
+	user := ctx.Flow.User
+	channel := ctx.Channel
+
+	token := user.Token
+	secret := user.Secret
+	workspace := strconv.Itoa( user.Workspace.Id )
+	userId := strconv.Itoa( user.Id )
+	domain := user.Workspace.Domain
+	params := "{}"
     jobs := clientset.BatchV1().Jobs("default")
     var backOffLimit int32 = 0
-
+	/*
+LINEBLOCS_TOKEN=
+LINEBLOCS_SECRET=
+LINEBLOCS_WORKSPACE_ID=1
+LINEBLOCS_USER_ID=1
+LINEBLOCS_DOMAIN=workspace.lineblocs.com
+CHANNEL_ID=1
+PARAMS={"test": 123}
+*/
     //jobSpec := bv1.Job("t", "123")
 	jobSpec := bv1.Job{
         ObjectMeta: metav1.ObjectMeta{
@@ -70,9 +93,49 @@ func launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *strin
                             Name:    *jobName,
                             Image:   *image,
                             Command: strings.Split(*cmd, " "),
+                    		ImagePullPolicy: v1.PullPolicy("IfNotPresent"),
+							Env: []v1.EnvVar{
+								{
+									Name: "LINEBLOCS_TOKEN",
+									Value: token,
+								},
+								{
+									Name: "LINEBLOCS_SECRET",
+									Value: secret,
+								},
+								{
+									Name: "LINEBLOCS_WORKSPACE_ID",
+									Value: workspace,
+								},
+								{
+									Name: "LINEBLOCS_USER_ID",
+									Value: userId,
+								},
+								{
+									Name: "LINEBLOCS_DOMAIN",
+									Value: domain,
+								},
+								{
+									Name: "CHANNEL_ID",
+									Value: channel.Channel.ID(),
+								},
+								{
+									Name: "PARAMS",
+									Value: params,
+								},
+								{
+									Name: "SCRIPT_B64",
+									Value: *script,
+								},
+							},
                         },
                     },
                     RestartPolicy: v1.RestartPolicyNever,
+					ImagePullSecrets: []v1.LocalObjectReference{
+						{
+							Name: "lineblocs-regcred",
+						},
+					},
                 },
             },
             BackoffLimit: &backOffLimit,
@@ -118,17 +181,16 @@ func (man *MacroManager) executeMacro() {
 		man.ManagerContext.RecvChannel <- &resp
 		return
 	}
+	sEnc := b64.StdEncoding.EncodeToString([]byte(foundFn.CompiledCode))
+	err := man.initializeK8sAndExecute(sEnc)
 
-	err := utils.RunScriptInContext(foundFn.CompiledCode)
 	if err != nil {
-		fmt.Println( err.Error ());
-
+		log.Error("error occured: " + err.Error());
 		resp := types.ManagerResponse{
 			Channel: channel,
 			Link: errorLink }
 		man.ManagerContext.RecvChannel <- &resp
 		return
-
 	}
 	resp := types.ManagerResponse{
 		Channel: channel,
