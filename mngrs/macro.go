@@ -1,7 +1,16 @@
 package mngrs
 import (
-	//"context"
 	//"github.com/CyCoreSystems/ari/v5"
+	//clientcmd "k8s.io/client-go/1.5/tools/clientcmd"
+    //"k8s.io/client-go/kubernetes"
+	"context"
+	"strings"
+	    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//batchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
+	bv1 "k8s.io/api/batch/v1"
+	    v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"fmt"
 	"lineblocs.com/processor/utils"
 	"lineblocs.com/processor/types"
@@ -19,19 +28,41 @@ func NewMacroManager(mngrCtx *types.Context, flow *types.Flow) (*MacroManager) {
 	return &item
 }
 
-
-
-/*
-func launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string) {
+func initializeK8sAndExecute() {
+	// creates the in-cluster config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		panic(err.Error())
+	}
+	// creates the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+	for {
+		//ctx := context.Background()
+		// get pods in all the namespaces by omitting namespace
+		// Or specify namespace to get pods in particular namespace
+		jobName := "lineblocs-runner"
+		image := "lineblocs/runner"
+		cmd := "-c BASE64"
+		err = launchK8sJob(clientset, &jobName, &image, &cmd)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+}
+func launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string) (error) {
     jobs := clientset.BatchV1().Jobs("default")
     var backOffLimit int32 = 0
 
-    jobSpec := &batchv1.Job{
+    //jobSpec := bv1.Job("t", "123")
+	jobSpec := bv1.Job{
         ObjectMeta: metav1.ObjectMeta{
             Name:      *jobName,
             Namespace: "default",
         },
-        Spec: batchv1.JobSpec{
+        Spec: bv1.JobSpec{
             Template: v1.PodTemplateSpec{
                 Spec: v1.PodSpec{
                     Containers: []v1.Container{
@@ -48,15 +79,16 @@ func launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *strin
         },
     }
 
-    _, err := jobs.Create(context.TODO(), jobSpec, metav1.CreateOptions{})
+    _, err := jobs.Create(context.TODO(), &jobSpec, metav1.CreateOptions{})
     if err != nil {
-        log.Fatalln("Failed to create K8s job.")
+        fmt.Println("Failed to create K8s job.")
+		return err
     }
 
     //print job details
-    log.Println("Created K8s job successfully")
+    fmt.Println("Created K8s job successfully")
+	return nil
 }
-*/
 
 func (man *MacroManager) executeMacro() {
 	log := man.ManagerContext.Log
