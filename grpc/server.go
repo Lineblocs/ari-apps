@@ -38,7 +38,15 @@ func (s *Server) lookupChannel( channelId string ) (*types.LineChannel, error) {
 
 	return &types.LineChannel{ Channel: channel }, nil
 }
-
+func (s *Server) safeSendToWS( clientid string, evt *ClientEvent ) {
+	wsChan := lookupWSChan( clientid )
+	if wsChan != nil {
+		fmt.Println("sending back to WS")
+		wsChan <- evt
+		return
+	}
+	fmt.Println("could not find WS to send to")
+}
 func (s *Server) startProcessingBridge( bridge *types.LineBridge, clientId string ) () {
 	h := bridge.Bridge
 	// Delete the bridge when we exit
@@ -76,8 +84,9 @@ func (s *Server) startProcessingBridge( bridge *types.LineBridge, clientId strin
 					ClientId: clientId,
 					Type: "bridge_ChannelJoined",
 					Data: data }
+
 				fmt.Println("sending client event..")
-				s.WsChan <- &evt 
+				s.safeSendToWS( clientId, &evt )
 			})
 		case e, ok := <-leaveSub.Events():
 			if !ok {
@@ -96,7 +105,7 @@ func (s *Server) startProcessingBridge( bridge *types.LineBridge, clientId strin
 					Type: "bridge_ChannelLeft",
 					Data: data }
 				fmt.Println("sending client event..")
-				s.WsChan <- &evt 
+				s.safeSendToWS( clientId, &evt )
 			})
 		}
 	}
@@ -147,7 +156,7 @@ func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, c
 					Type: "channel_DTMFReceived",
 					Data: data }
 				fmt.Println("sending client event..")
-				s.WsChan <- &evt 
+				s.safeSendToWS( clientId, &evt )
 			})
 		case e := <-startSub.Events():
 
@@ -166,7 +175,7 @@ func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, c
 					Type: "channel_ChannelStart",
 					Data: data }
 				fmt.Println("sending client event..")
-				s.WsChan <- &evt 
+				s.safeSendToWS( clientId, &evt )
 			})
 		case e, ok := <-endSub.Events():
 			if !ok {
@@ -187,7 +196,7 @@ func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, c
 					Data: data }
 
 				fmt.Println("sending client event..")
-				s.WsChan <- &evt 
+				s.safeSendToWS( clientId, &evt )
 			})
 		}
 	}
@@ -211,7 +220,7 @@ func (s *Server) managePrompt(playback *ari.PlaybackHandle, clientId string) {
 					Type: "playback_PlaybackFinished",
 					Data: data }
 					fmt.Println("sending client event..")
-				s.WsChan <- &evt
+				s.safeSendToWS( clientId, &evt )
 			})
 			return
 		}
@@ -287,7 +296,7 @@ func (s *Server) CreateBridge(ctx context.Context, req *BridgeRequest) (*BridgeR
 			Type: "bridge_BridgeCreated",
 			Data: data }
 			fmt.Println("sending client event..")
-		s.WsChan <- &evt
+		s.safeSendToWS( clientId, &evt )
 	})
 
 	lineBridge := types.LineBridge{
@@ -454,7 +463,7 @@ func (s *Server) CreateConference(ctx context.Context, req *ConferenceRequest) (
 			Type: "conference_ConfCreated",
 			Data: data }
 			fmt.Println("sending client event..")
-		s.WsChan <- &evt
+		s.safeSendToWS( clientId, &evt )
 	})
 	return &reply, nil
 }

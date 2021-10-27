@@ -11,11 +11,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type ClientEvent struct {
-	ClientId string `json:"client_id"`
-	Type string `json:"type"`
-	Data map[string]string `json:"data"`
-}
 var addr = "0.0.0.0:8018"
 
 var upgrader = websocket.Upgrader{
@@ -28,7 +23,7 @@ var upgrader = websocket.Upgrader{
 
 } // use default options
 
-func processEvents(c *websocket.Conn, clientId string, wsChan <-chan *ClientEvent) {
+func processEvents(c *websocket.Conn, clientId string, wsChan <-chan *ClientEvent, stopChan <-chan bool) {
 
 	for {
 		select {
@@ -48,7 +43,9 @@ func processEvents(c *websocket.Conn, clientId string, wsChan <-chan *ClientEven
 				if err != nil {
 					fmt.Println("error: " + err.Error())	
 				}
-			
+			case _ = <- stopChan:
+				fmt.Println("closing event processor..")
+				return
 			break;
 			default:
 		
@@ -56,32 +53,34 @@ func processEvents(c *websocket.Conn, clientId string, wsChan <-chan *ClientEven
 		}
 	}
 }
-func ws( wsChan <-chan *ClientEvent ) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request)  {
-		v := r.URL.Query()
-       	clientId := v.Get("clientId")
-		   log.Printf("got connection from: %s\r\n", clientId)
-		c, err := upgrader.Upgrade(w, r, nil)
+func ws(w http.ResponseWriter, r *http.Request) {
+	v := r.URL.Query()
+	stopChan := make( chan bool )
+	clientId := v.Get("clientId")
+	wsChan := createWSChan(clientId)
+	log.Printf("got connection from: %s\r\n", clientId)
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Print("upgrade:", err)
+		return
+	}
+	go processEvents( c, clientId, wsChan, stopChan )
+	defer c.Close()
+	for {
+		_, _, err := c.ReadMessage()
 		if err != nil {
-			log.Print("upgrade:", err)
-			return
+			log.Println("read:", err)
+			log.Print("error: " +  err.Error())
+			stopChan <- true
+			c.Close()
+			break
 		}
-		go processEvents( c, clientId, wsChan )
-		defer c.Close()
-		for {
-			_, _, err := c.ReadMessage()
-			if err != nil {
-				log.Println("read:", err)
-				break
-			}
-			//log.Printf("recv: %s", message)
-		}
+		//log.Printf("recv: %s", message)
 	}
 }
 
-func startWebsocketServer( wsChan <-chan *ClientEvent ) {
-	wsHandler := ws( wsChan )
-	http.HandleFunc("/", wsHandler)
+func startWebsocketServer( ) {
+	http.HandleFunc("/", ws)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 func StartListener(cl ari.Client) {
@@ -91,7 +90,7 @@ func StartListener(cl ari.Client) {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	go startWebsocketServer(wsChan)
+	go startWebsocketServer()
 	fmt.Println("GRPC is running!!");
 	s := NewServer(cl, wsChan)
 
