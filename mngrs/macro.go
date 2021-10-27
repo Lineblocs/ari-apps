@@ -20,6 +20,44 @@ func NewMacroManager(mngrCtx *types.Context, flow *types.Flow) (*MacroManager) {
 }
 
 
+
+/*
+func launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string) {
+    jobs := clientset.BatchV1().Jobs("default")
+    var backOffLimit int32 = 0
+
+    jobSpec := &batchv1.Job{
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      *jobName,
+            Namespace: "default",
+        },
+        Spec: batchv1.JobSpec{
+            Template: v1.PodTemplateSpec{
+                Spec: v1.PodSpec{
+                    Containers: []v1.Container{
+                        {
+                            Name:    *jobName,
+                            Image:   *image,
+                            Command: strings.Split(*cmd, " "),
+                        },
+                    },
+                    RestartPolicy: v1.RestartPolicyNever,
+                },
+            },
+            BackoffLimit: &backOffLimit,
+        },
+    }
+
+    _, err := jobs.Create(context.TODO(), jobSpec, metav1.CreateOptions{})
+    if err != nil {
+        log.Fatalln("Failed to create K8s job.")
+    }
+
+    //print job details
+    log.Println("Created K8s job successfully")
+}
+*/
+
 func (man *MacroManager) executeMacro() {
 	log := man.ManagerContext.Log
 	cell := man.ManagerContext.Cell

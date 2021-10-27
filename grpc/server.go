@@ -259,7 +259,7 @@ func NewServer(cl ari.Client, wsChan chan<- *ClientEvent) (*Server) {
 type event func()
 func (s *Server) dispatchEvent( handler event ) {
 	go func() {
-		time.Sleep(time.Duration(1000) * time.Millisecond)
+		time.Sleep(time.Duration(500) * time.Millisecond)
 
 
 		// call the handler
