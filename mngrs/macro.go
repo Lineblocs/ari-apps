@@ -6,14 +6,20 @@ import (
 	"context"
 	"strings"
 	"strconv"
+	"path/filepath"
+	"encoding/json"
+	"github.com/google/uuid"
 	    b64 "encoding/base64"
 	    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	//batchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
 	bv1 "k8s.io/api/batch/v1"
 	    v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	rest "k8s.io/client-go/rest"
+		"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"fmt"
+	"errors"
 	"lineblocs.com/processor/utils"
 	"lineblocs.com/processor/types"
 )
@@ -29,9 +35,31 @@ func NewMacroManager(mngrCtx *types.Context, flow *types.Flow) (*MacroManager) {
 		Flow: flow}
 	return &item
 }
-func (man *MacroManager) initializeK8sAndExecute(b64code string) (error) {
+
+func createK8SConfig() (*rest.Config, error) {
+	var kubeconfig string
+	home := homedir.HomeDir()
+	if home == "" {
+		return nil, errors.New("cannot get HOME dir")
+	}
+	kubeconfig = filepath.Join(home, ".kube", "config")
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		//panic(err.Error())
+		return nil, err
+	}
+	return config, nil
+}
+func (man *MacroManager) initializeK8sAndExecute(b64code string, params string) (error) {
+	ctx := man.ManagerContext
+	log := ctx.Log
+
+
+	log.Debug("Starting K8s job...")
+	log.Debug("params: " + params)
 	// creates the in-cluster config
-	config, err := rest.InClusterConfig()
+	//config, err := rest.InClusterConfig()
+	config, err := createK8SConfig()
 	if err != nil {
 		//panic(err.Error())
 		return err
@@ -45,11 +73,17 @@ func (man *MacroManager) initializeK8sAndExecute(b64code string) (error) {
 	//ctx := context.Background()
 	// get pods in all the namespaces by omitting namespace
 	// Or specify namespace to get pods in particular namespace
-	jobName := "lineblocs-runner"
+
+	uniq, err := uuid.NewUUID()
+	if err != nil {
+		log.Error(err.Error())
+		return err
+	}
+	jobName := "lineblocs-runner-" + uniq.String()
 	//image := "lineblocs/runner"
 	image := "754569496111.dkr.ecr.ca-central-1.amazonaws.com/lineblocs-k8s-runner:latest"
 	cmd := "node /var/app/index.js"
-	err = man.launchK8sJob(clientset, &jobName, &image, &cmd ,&b64code)
+	err = man.launchK8sJob(clientset, &jobName, &image, &cmd ,&b64code, &params)
 	if err != nil {
 		//panic(err.Error())
 		return err
@@ -57,8 +91,9 @@ func (man *MacroManager) initializeK8sAndExecute(b64code string) (error) {
 	return nil
 }
 
-func (man *MacroManager) launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string, script *string) (error) {
+func (man *MacroManager) launchK8sJob(clientset *kubernetes.Clientset, jobName *string, image *string, cmd *string, script *string, params *string) (error) {
 	ctx := man.ManagerContext
+	log := ctx.Log
 	user := ctx.Flow.User
 	channel := ctx.Channel
 
@@ -67,7 +102,9 @@ func (man *MacroManager) launchK8sJob(clientset *kubernetes.Clientset, jobName *
 	workspace := strconv.Itoa( user.Workspace.Id )
 	userId := strconv.Itoa( user.Id )
 	domain := user.Workspace.Domain
-	params := "{}"
+
+
+	log.Debug("Running..")
     jobs := clientset.BatchV1().Jobs("default")
     var backOffLimit int32 = 0
 	/*
@@ -94,6 +131,7 @@ PARAMS={"test": 123}
                             Image:   *image,
                             Command: strings.Split(*cmd, " "),
                     		ImagePullPolicy: v1.PullPolicy("IfNotPresent"),
+                    		//ImagePullPolicy: v1.PullPolicy("Always"),
 							Env: []v1.EnvVar{
 								{
 									Name: "LINEBLOCS_TOKEN",
@@ -121,7 +159,7 @@ PARAMS={"test": 123}
 								},
 								{
 									Name: "PARAMS",
-									Value: params,
+									Value: *params,
 								},
 								{
 									Name: "SCRIPT_B64",
@@ -144,7 +182,7 @@ PARAMS={"test": 123}
 
     _, err := jobs.Create(context.TODO(), &jobSpec, metav1.CreateOptions{})
     if err != nil {
-        fmt.Println("Failed to create K8s job.")
+        fmt.Println("Failed to create K8s job. error: " + err.Error())
 		return err
     }
 
@@ -162,17 +200,35 @@ func (man *MacroManager) executeMacro() {
 	log.Debug("running macro script..");
 
 	function := model.Data["function"].ValueStr
+	params := model.Data["params"].ValueObj
 
 	completed, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Completed")
 	errorLink, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Error")
 
 	var foundFn *types.WorkspaceMacro
+
+
+
 	// find the code
 	for _, macro := range flow.WorkspaceFns {
 		if macro.Title ==  function {
 			foundFn = macro
 		}
 	}
+	paramsEncoded, err := json.Marshal(params)
+	if err != nil {
+		log.Error("error occured: " + err.Error());
+		resp := types.ManagerResponse{
+			Channel: channel,
+			Link: errorLink }
+		man.ManagerContext.RecvChannel <- &resp
+		return
+	}
+
+	sEnc := b64.StdEncoding.EncodeToString([]byte(""))
+	err = man.initializeK8sAndExecute(sEnc, string(paramsEncoded))
+	return
+
 	if foundFn == nil {
 		log.Debug("could not find macro function...")
 		resp := types.ManagerResponse{
@@ -181,8 +237,8 @@ func (man *MacroManager) executeMacro() {
 		man.ManagerContext.RecvChannel <- &resp
 		return
 	}
-	sEnc := b64.StdEncoding.EncodeToString([]byte(foundFn.CompiledCode))
-	err := man.initializeK8sAndExecute(sEnc)
+	//sEnc := b64.StdEncoding.EncodeToString([]byte(foundFn.CompiledCode))
+	//err := man.initializeK8sAndExecute(sEnc)
 
 	if err != nil {
 		log.Error("error occured: " + err.Error());

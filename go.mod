@@ -28,6 +28,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/imdario/mergo v0.3.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/lestrrat-go/backoff/v2 v2.0.8 // indirect
@@ -37,6 +38,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/u2takey/ffmpeg-go v0.3.0 // indirect
 	github.com/u2takey/go-utils v0.0.0-20210821132353-e90f7c6bacb5 // indirect
 	github.com/zaf/resample v0.0.0-20200305235742-54008d320155 // indirect
