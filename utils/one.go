@@ -163,7 +163,8 @@ func CreateCall( id string, channel *types.LineChannel, params *types.CallParams
 // TODO call API to get proxy IPs
 func GetSIPProxy() (string) {
 	//return "proxy1";
-	return "52.60.126.237"
+	//return "52.60.126.237"
+	return "159.89.124.168"
 }
 
 func CreateChannelRequest(numberToCall string) (ari.ChannelCreateRequest) {
@@ -219,7 +220,8 @@ func SafeHangup(lineChannel *types.LineChannel) {
 
 func GetSIPSecretKey() string {
 	//return "BrVIsXzQx9-7lvRsXMC2V57dA4UEc-G_HwnCpK-zctk"
-	return "BrVIsXzQx9-7lvRsXMC2V57dA4UEc-G_HwnCpK-zctk"
+	//return "BrVIsXzQx9-7lvRsXMC2V57dA4UEc-G_HwnCpK-zctk"
+	return "xxx"
 }
 
 
