@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package router;
+option go_package = "./";
+
+// Interface exported by the server.
+service LineblocsWorspaceSvc {
+  rpc CallMacro(EventContext) returns (MacroResult) {}
+}
+
+message EventContext {
+  string name = 1;
+  map<string, string> event = 2;
+}
+
+message MacroResult  {
+  bool error = 1;
+  string msg = 2;
+  string result = 3;
+}

@@ -120,6 +120,15 @@ func (s *Server) addBridgeChannel( bridge *types.LineBridge, channel *types.Line
 	return nil
 }
 
+func (s *Server) removeBridgeChannel( bridge *types.LineBridge, channel *types.LineChannel ) (error) {
+	err := bridge.Bridge.RemoveChannel(channel.Channel.Key().ID)
+	if err != nil {
+		return err
+	}
+	utils.RemoveChannelFromBridge(bridge, channel)
+	return nil
+}
+
 func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, clientId string, ringTimeoutChan chan<- bool) () {
 	h := callChannel.Channel
 	// Delete the bridge when we exit
@@ -723,6 +732,29 @@ func (s *Server) BridgeAddChannels(ctx context.Context, req *BridgeChannelsReque
 		s.addBridgeChannel( bridge, channel )
 	}
 	reply := BridgeChannelsReply{}
+	return &reply, nil
+}
+func (s *Server) BridgeRemoveChannel(ctx context.Context, req *BridgeChannelRequest) (*BridgeChannelReply, error) {
+	fmt.Println("remove bridge channel!!!");
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	fmt.Println("client ID = " + clientId)
+	bridge, err := s.lookupBridge( req.BridgeId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	channel, err := s.lookupChannel( req.ChannelId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+	fmt.Println("adding channel now!!!");
+
+	s.removeBridgeChannel( bridge, channel )
+	reply := BridgeChannelReply{}
 	return &reply, nil
 }
 func (s *Server) BridgePlayTTS(ctx context.Context, req *BridgeTTSRequest) (*BridgeTTSReply, error) {

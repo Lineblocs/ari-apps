@@ -30,6 +30,7 @@ service Lineblocs {
 // bridge functions
   rpc bridge_addChannel (BridgeChannelRequest) returns (BridgeChannelReply) {}
   rpc bridge_addChannels (BridgeChannelsRequest) returns (BridgeChannelsReply) {}
+  rpc bridge_removeChannel (BridgeChannelRequest) returns (BridgeChannelReply) {}
   rpc bridge_playTTS (BridgeTTSRequest) returns (BridgeTTSReply) {}
   rpc bridge_automateLegAHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
   rpc bridge_automateLegBHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}

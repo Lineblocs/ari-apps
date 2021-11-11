@@ -419,6 +419,16 @@ func AddChannelToBridge( bridge *types.LineBridge, channel *types.LineChannel) {
 	bridge.Channels = append( bridge.Channels, channel )
 }
 
+func RemoveChannelFromBridge( bridge *types.LineBridge, channel *types.LineChannel) {
+	channels := make([]*LineChannel)
+	for _, item := range bridge.Channels {
+		if item.Channel.ID != channel.ID {
+			channels = append( channels, item )
+		}
+	}
+	bridge.Channels =channels
+}
+
 func ParseRingTimeout( value string ) (int) {
 	result, err := strconv.Atoi( value )
 
