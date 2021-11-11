@@ -4,7 +4,7 @@
 // 	protoc        v3.19.1
 // source: router.proto
 
-package router
+package __
 
 import (
 	context "context"

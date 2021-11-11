@@ -22,7 +22,55 @@ import (
 	"errors"
 	"lineblocs.com/processor/utils"
 	"lineblocs.com/processor/types"
+	"log"
+
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"lineblocs.com/processor/router"
 )
+
+func (*man MacroManager) startGRPCAndRunMacro(macro *WorkspaceMacro) {
+	ctx := man.ManagerContext
+	log := ctx.Log
+	user := ctx.Flow.User
+	channel := ctx.Channel
+	flow := ctx.Flow
+	cell := ctx.Cell
+	var conn *grpc.ClientConn
+
+	// get the service URL for the user
+	// <service-name>.<namespace>.svc.cluster.local:<service-port>
+	name := "voip-users"
+	port := "10000"
+	svcUri := fmt.Sprintf("%s.%s.svc.cluster.local:%s", user.WorkspaceName, name, port)
+	conn, err := grpc.Dial(svcUri, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %s", err)
+	}
+	defer conn.Close()
+
+	c := router.NewLineblocsWorspaceSvcClient(conn)
+	params := make(map[string]string)
+	params["channel_id"] = channel.Channel.ID
+	params["flow_id"] = strconv.Itoa( flow.FlowId )
+	params["cell_id"] = cell.Cell.Id
+	params["cell_name"] = cell.Cell.Name
+	ctx := router.EventContext{
+		Name: macro.Title,
+		Event: params }
+	response, err := c.CallMacro(context.Background(), &ctx)
+	if err != nil {
+		log.Fatalf("Error when calling CallMacro: %s", err)
+		return
+	}
+	if response.Error {
+		log.Fatalf("macro resulted in error: %s", response.Msg)
+		return
+	}
+	log.Printf("Response from server: %s", response.Result)
+
+}
+
 type MacroManager struct {
 	ManagerContext *types.Context
 	Flow *types.Flow
@@ -225,9 +273,7 @@ func (man *MacroManager) executeMacro() {
 		return
 	}
 
-	sEnc := b64.StdEncoding.EncodeToString([]byte(""))
-	err = man.initializeK8sAndExecute(sEnc, string(paramsEncoded))
-	return
+	err = man.startGRPCAndRunMacro(foundFn)
 
 	if foundFn == nil {
 		log.Debug("could not find macro function...")
