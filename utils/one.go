@@ -420,9 +420,9 @@ func AddChannelToBridge( bridge *types.LineBridge, channel *types.LineChannel) {
 }
 
 func RemoveChannelFromBridge( bridge *types.LineBridge, channel *types.LineChannel) {
-	channels := make([]*LineChannel)
+	channels := make([]*types.LineChannel, 0)
 	for _, item := range bridge.Channels {
-		if item.Channel.ID != channel.ID {
+		if item.Channel.ID() != channel.Channel.ID() {
 			channels = append( channels, item )
 		}
 	}
