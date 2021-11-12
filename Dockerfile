@@ -9,6 +9,7 @@ LABEL maintainer="Nadir Hamid <matrix.nad@gmail.com>"
 # Set the Current Working Directory inside the container
 WORKDIR /app
 
+RUN apt-get -y update && apt-get install bash
 # Copy go mod and sum files
 COPY go.mod go.sum ./
 
@@ -26,8 +27,8 @@ COPY . .
 # Build the Go app
 RUN GOPRIVATE=bitbucket.org/infinitet3ch go build -o main .
 
-# Expose port 80 to the outside world
-EXPOSE 80
+# Expose port 80 to the outside world (used for GRPC)
+EXPOSE 8018
 
 # Command to run the executable
-CMD ["./main"]
+ENTRYPOINT ["/bin/bash", "./entrypoint.sh"]

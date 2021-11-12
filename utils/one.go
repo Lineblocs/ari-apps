@@ -164,7 +164,8 @@ func CreateCall( id string, channel *types.LineChannel, params *types.CallParams
 func GetSIPProxy() (string) {
 	//return "proxy1";
 	//return "52.60.126.237"
-	return "159.89.124.168"
+	//return "159.89.124.168"
+	return os.Getenv("PROXY_HOST")
 }
 
 func CreateChannelRequest(numberToCall string) (ari.ChannelCreateRequest) {

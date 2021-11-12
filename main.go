@@ -1,7 +1,7 @@
 package main
 
 import (
-	    "github.com/joho/godotenv"
+	    _ "github.com/joho/godotenv"
 		"context"
 		"os"
 	"sync"
@@ -305,11 +305,14 @@ func main() {
 	native.Logger = log
 
 	log.Info("Connecting")
+
+	/*
 	 err := godotenv.Load()
 	if err != nil {
 		log.Info("Error loading .env file")
 		return
 	}
+	*/
 	ctx, cancel := context.WithCancel(context.Background())
 	connectCtx, cancel2 := context.WithCancel(context.Background())
 	defer cancel()
