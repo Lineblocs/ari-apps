@@ -30,5 +30,6 @@ RUN GOPRIVATE=bitbucket.org/infinitet3ch go build -o main .
 # Expose port 80 to the outside world (used for GRPC)
 EXPOSE 8018
 
+RUN ls -a /app/
 # Command to run the executable
 ENTRYPOINT ["/bin/bash", "./entrypoint.sh"]
