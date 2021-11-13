@@ -9,7 +9,7 @@ LABEL maintainer="Nadir Hamid <matrix.nad@gmail.com>"
 # Set the Current Working Directory inside the container
 WORKDIR /app
 
-RUN apt-get -y update && apt-get install bash
+RUN apt-get -y update && apt-get install -y bash netdiscover
 # Copy go mod and sum files
 COPY go.mod go.sum ./
 
