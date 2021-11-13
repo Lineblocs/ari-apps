@@ -15,6 +15,7 @@ import (
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 	"lineblocs.com/processor/api"
+	"lineblocs.com/processor/helpers"
 )
 type BridgeManager struct {
 	ManagerContext *types.Context
@@ -295,6 +296,8 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 	wg1.Add(1)
 	utils.AddChannelToBridge( bridge, channel )
 	utils.AddChannelToBridge( bridge, &outChannel )
+	record := helpers.NewRecording(flow.User)
+	go record.InitiateRecordingForBridge(bridge)
  	go man.manageOutboundCallLeg(&outChannel, bridge, wg1, stopChannel)
 
 	wg1.Wait()
@@ -343,7 +346,6 @@ func (man *BridgeManager) StartProcessing() {
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	user := flow.User
-	channel := man.ManagerContext.Channel
 	data := cell.Model.Data
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Connected Call Ended")
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Caller Hung Up")
@@ -352,7 +354,6 @@ func (man *BridgeManager) StartProcessing() {
 	// create the bridge
 
 	callType := data["call_type"]
-	_ = types.NewRecording(flow.User, channel, true)
 
 	log.Debug("processing call type: " + callType.ValueStr)
 	if callType.ValueStr == "Extension" || callType.ValueStr == "Phone Number" {

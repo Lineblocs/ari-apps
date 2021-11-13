@@ -10,6 +10,7 @@ import (
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 	"lineblocs.com/processor/api"
+	"lineblocs.com/processor/helpers"
 )
 type DialManager struct {
 	ManagerContext *types.Context
@@ -208,12 +209,11 @@ func (man *DialManager) StartProcessing() {
 
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
-	channel := man.ManagerContext.Channel
 	data := cell.Model.Data
 	// create the bridge
 
 	callType := data["call_type"]
-	_ = types.NewRecording(flow.User, channel, true)
+	_ = helpers.NewRecording(flow.User)
 
 	log.Debug("processing call type: " + callType.ValueStr)
 	log.Debug( "Creating DIAL... ")

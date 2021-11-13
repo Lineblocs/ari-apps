@@ -17,6 +17,7 @@ import (
 	status "google.golang.org/grpc/status"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
+	"lineblocs.com/processor/helpers"
 	"lineblocs.com/processor/api"
 	"lineblocs.com/processor/mngrs"
 )
@@ -37,6 +38,13 @@ func (s *Server) lookupChannel( channelId string ) (*types.LineChannel, error) {
 	channel := s.Client.Channel().Get(src)
 
 	return &types.LineChannel{ Channel: channel }, nil
+}
+
+func (s *Server) lookupRecording( recordingId string ) (*helpers.Record, error) {
+	src := ari.NewKey(ari.LiveRecordingKey, recordingId)
+	rec := s.Client.LiveRecording().Get(src)
+
+	return &helpers.Record{ Handle: rec }, nil
 }
 func (s *Server) safeSendToWS( clientid string, evt *ClientEvent ) {
 	wsChan := lookupWSChan( clientid )
@@ -686,6 +694,53 @@ func (s *Server) ChannelHangup(ctx context.Context, req *GenericChannelReq) (*Ge
 	resp := GenericChannelResp{}
 	return &resp, nil
 }
+func (s *Server) ChannelRecord(ctx context.Context, req *GenericChannelReq) (*GenericChannelResp, error) {
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	workspaceId := headers["workspaceid"][0]
+	userId := headers["userid"][0]
+	domain := headers["domain"][0]
+	fmt.Println("client ID = " + clientId)
+	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
+	userIdInt, err := strconv.Atoi( userId )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+	workspace, err := strconv.Atoi( workspaceId )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+
+	channel, err := s.lookupChannel( req.ChannelId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+	user := types.NewUser(userIdInt, workspace, workspaceName)
+	recording := helpers.NewRecording( user )
+	id, err :=recording.InitiateRecordingForChannel(channel)
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+	s.dispatchEvent(func() {
+		// send to channel
+		data := make(map[string]string)
+		data["recording_id"] = id
+		evt:= ClientEvent{
+			ClientId: clientId,
+			Type: "recording_RecordingStarted",
+			Data: data }
+			fmt.Println("sending client event..")
+		s.safeSendToWS( clientId, &evt )
+	})
+	resp := GenericChannelResp{}
+	return &resp, nil
+}
 func (s *Server) BridgeAddChannel(ctx context.Context, req *BridgeChannelRequest) (*BridgeChannelReply, error) {
 	fmt.Println("adding channel to bridge!!!");
 	headers, ok := metadata.FromIncomingContext(ctx)
@@ -756,6 +811,64 @@ func (s *Server) BridgeRemoveChannel(ctx context.Context, req *BridgeChannelRequ
 	s.removeBridgeChannel( bridge, channel )
 	reply := BridgeChannelReply{}
 	return &reply, nil
+}
+
+func (s *Server) BridgeGetChannels(ctx context.Context, req *GenericBridgeReq) (*BridgeChannelsReply, error) {
+	return nil, nil
+}
+
+func (s *Server) BridgeHangupAllChannels(ctx context.Context, req *GenericBridgeReq) (*GenericBridgeResp, error) {
+	return nil, nil
+}
+func (s *Server) BridgeHangupChannel(ctx context.Context, req *BridgeChannelRequest) (*GenericBridgeResp, error) {
+	return nil, nil
+}
+func (s *Server) BridgeRecord(ctx context.Context, req *GenericBridgeReq) (*GenericBridgeResp, error) {
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	workspaceId := headers["workspaceid"][0]
+	userId := headers["userid"][0]
+	domain := headers["domain"][0]
+	fmt.Println("client ID = " + clientId)
+	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
+	userIdInt, err := strconv.Atoi( userId )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+	workspace, err := strconv.Atoi( workspaceId )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+	bridge, err := s.lookupBridge( req.BridgeId )
+	if err != nil {
+		return nil, eris.Wrap(err, "failed to add channel to bridge")
+	}
+
+	user := types.NewUser(userIdInt, workspace, workspaceName)
+	recording := helpers.NewRecording( user )
+	id, err := recording.InitiateRecordingForBridge(bridge)
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+	s.dispatchEvent(func() {
+		// send to channell
+		data := make(map[string]string)
+		data["recording_id"] = id
+		evt:= ClientEvent{
+			ClientId: clientId,
+			Type: "recording_RecordingStarted",
+			Data: data }
+			fmt.Println("sending client event..")
+		s.safeSendToWS( clientId, &evt )
+	})
+	resp := GenericBridgeResp{}
+	return &resp, nil
 }
 func (s *Server) BridgePlayTTS(ctx context.Context, req *BridgeTTSRequest) (*BridgeTTSReply, error) {
 	headers, ok := metadata.FromIncomingContext(ctx)
@@ -860,4 +973,44 @@ func (s *Server) BridgeDestroy(ctx context.Context, req *GenericBridgeReq) (*Gen
 	//bridge.EndBridgeCall()
 	resp := GenericBridgeResp{}
 	return &resp, nil
+}
+
+func (s *Server) RecordingStop(ctx context.Context, req *RecordingRequest) (*RecordingReply, error) {
+	fmt.Println("stopping recording..")
+	headers, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("could not get metadata")
+	}
+	clientId := headers["clientid"][0]
+	workspaceId := headers["workspaceid"][0]
+	userId := headers["userid"][0]
+	domain := headers["domain"][0]
+	fmt.Println("client ID = " + clientId)
+	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
+	userIdInt, err := strconv.Atoi( userId )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+	workspace, err := strconv.Atoi( workspaceId )
+	if err != nil {
+		fmt.Println("startExecution err " + err.Error())
+		return nil, err
+	}
+
+	user := types.NewUser(userIdInt, workspace, workspaceName)
+	recording := helpers.NewRecording( user )
+	go recording.Stop()
+	s.dispatchEvent(func() {
+		// send to channel
+		data := make(map[string]string)
+		data["recording_id"] = recording.Handle.ID()
+		evt:= ClientEvent{
+			ClientId: clientId,
+			Type: "recording_RecordingStopped",
+			Data: data }
+			fmt.Println("sending client event..")
+		s.safeSendToWS( clientId, &evt )
+	})
+	return &RecordingReply{}, nil
 }

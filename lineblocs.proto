@@ -25,6 +25,7 @@ service Lineblocs {
   rpc channel_startFlow (ChannelStartFlowWidgetRequest) returns (ChannelStartFlowWidgetReply) {}
   rpc channel_startRinging (GenericChannelReq) returns (GenericChannelResp) {}
   rpc channel_stopRinging (GenericChannelReq) returns (GenericChannelResp) {}
+  rpc channel_record (GenericChannelReq) returns (GenericChannelResp) {}
   rpc channel_hangup(GenericChannelReq) returns (GenericChannelResp) {}
 
 // bridge functions
@@ -34,14 +35,22 @@ service Lineblocs {
   rpc bridge_playTTS (BridgeTTSRequest) returns (BridgeTTSReply) {}
   rpc bridge_automateLegAHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
   rpc bridge_automateLegBHangup (BridgeAutomateLegRequest) returns (BridgeAutomateLegReply) {}
+  rpc bridge_hangupChannel (BridgeChannelRequest) returns (GenericBridgeResp) {}
+  rpc bridge_hangupAllChannels (GenericBridgeReq) returns (GenericBridgeResp) {}
+  rpc bridge_getChannels (GenericBridgeReq) returns (BridgeChannelsReply) {}
   rpc bridge_destroy (GenericBridgeReq) returns (GenericBridgeResp) {}
+  rpc bridge_record (GenericBridgeReq) returns (GenericBridgeResp) {}
   rpc bridge_attachEventListener (BridgeEventRequest) returns (BridgeEventReply) {}
+  
 
 // conference functions
   rpc conference_addWaitingParticipant (ConferenceParticipantRequest) returns (ConferenceParticipantReply) {}
   rpc conference_addParticipant (ConferenceParticipantRequest) returns (ConferenceParticipantReply) {}
   rpc conference_setModeratorInConf (ConferenceModeratorRequest) returns (ConferenceModeratorReply) {}
   rpc conference_attachEventListener (ConferenceEventRequest) returns (ConferenceEventReply) {}
+
+  // recording functions
+  rpc recording_stop (RecordingRequest) returns (RecordingReply) {}
 }
 
 message BridgeRequest {
@@ -180,13 +189,14 @@ message BridgeChannelRequest {
 message BridgeChannelReply {
 }
 
+message BridgeChannelsReply {
+	repeated string channel_id = 1;
+}
+
 
 message BridgeChannelsRequest {
 	string bridge_id = 1;
 	repeated string channel_id = 2;
-}
-
-message BridgeChannelsReply {
 }
 
 message BridgeTTSRequest {
@@ -280,4 +290,11 @@ message ConferenceEventRequest {
 }
 
 message ConferenceEventReply {
+}
+
+message RecordingRequest {
+	string recording_id = 1;
+}
+
+message RecordingReply {
 }

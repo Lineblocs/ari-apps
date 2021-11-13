@@ -24,6 +24,9 @@ import (
 		    "github.com/go-redis/redis/v8"
 	        texttospeech "cloud.google.com/go/texttospeech/apiv1"
         texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
+        speech "cloud.google.com/go/speech/apiv1"
+        speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
+	"github.com/CyCoreSystems/ari/v5/ext/record"
 )
 
 
@@ -395,6 +398,81 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 	}
 
 
+	return link, nil
+}
+
+func StartSTT(fileURI string) (string, error) {
+        ctx := context.Background()
+
+        // Creates a client.
+        client, err := speech.NewClient(ctx)
+        if err != nil {
+                fmt.Printf("Failed to create client: %v", err)
+				return "", err
+        }
+        defer client.Close()
+
+        // Detects speech in the audio file.
+        resp, err := client.Recognize(ctx, &speechpb.RecognizeRequest{
+                Config: &speechpb.RecognitionConfig{
+                        Encoding:        speechpb.RecognitionConfig_LINEAR16,
+                        SampleRateHertz: 8000,
+                        LanguageCode:    "en-US",
+                },
+                Audio: &speechpb.RecognitionAudio{
+                        AudioSource: &speechpb.RecognitionAudio_Uri{Uri: fileURI},
+                },
+        })
+        if err != nil {
+                fmt.Printf("failed to recognize: %v", err)
+				return "", err
+        }
+
+        // Prints the results.
+		text := ""
+		var highestConfidence float32 =0.0
+        for _, result := range resp.Results {
+                for _, alt := range result.Alternatives {
+                        fmt.Printf("\"%v\" (confidence=%3f)\n", alt.Transcript, alt.Confidence)
+						if highestConfidence == 0.0 || alt.Confidence > highestConfidence {
+							text = alt.Transcript
+							highestConfidence = alt.Confidence
+						}
+                }
+        }
+		return text, nil
+}
+
+
+func SaveLiveRecording(result *record.Result) (string, error) {
+	var folder string = "/tmp/"
+	uniq, err := uuid.NewUUID()
+	if err != nil {
+		log.Error(err.Error())
+		return "", err
+	}
+
+	/*
+	data, err  := result.File()
+	if err != nil {
+		log.Error(err.Error())
+		return "", err
+	}
+	*/
+	data := []byte("")
+ 	filename := (uniq.String() + ".wav")
+	fullPathToFile := folder + filename
+
+	err = ioutil.WriteFile(fullPathToFile, data, 0644)
+	if err != nil {
+			log.Error(err.Error())
+			return "", err
+	}
+	fmt.Printf("Audio content written to file: %v\n", fullPathToFile)
+	err, link  := sendToAssetServer(  fullPathToFile, filename )
+	if err != nil {
+		return "", err
+	}
 	return link, nil
 }
 
