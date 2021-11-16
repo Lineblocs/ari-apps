@@ -89,10 +89,18 @@ func (man *BridgeManager) addAllRequestedCalls(bridge *types.LineBridge) {
 func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGroup, callType string) {
 	h := bridge.Bridge
 	ctx := man.ManagerContext
+	flow:=ctx.Flow
 	cell := ctx.Cell
 	channel := ctx.Channel
 	log := ctx.Log
+	record := helpers.NewRecording(flow.User)
+	_,recordErr:=record.InitiateRecordingForBridge(bridge)
 	next, _ := utils.FindLinkByName( cell.TargetLinks, "source", "Connected Call Ended")
+
+	if recordErr != nil {
+		log.Error("error starting recording: " + recordErr.Error())
+		return
+	}
 
 	log.Debug("manageBridge called..")
 	// Delete the bridge when we exit
@@ -132,6 +140,7 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 			v := e.(*ari.ChannelLeftBridge)
 			log.Debug("channel left bridge", "channel", v.Channel.Name)
 			man.endBridgeCall(bridge)
+			record.Stop()
 
 			resp := types.ManagerResponse{
 				Channel: channel,
@@ -295,8 +304,6 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 	wg1.Add(1)
 	utils.AddChannelToBridge( bridge, channel )
 	utils.AddChannelToBridge( bridge, &outChannel )
-	record := helpers.NewRecording(flow.User)
-	go record.InitiateRecordingForBridge(bridge)
  	go man.manageOutboundCallLeg(&outChannel, bridge, wg1, stopChannel)
 
 	wg1.Wait()

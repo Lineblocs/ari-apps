@@ -22,6 +22,17 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 	lineChannel := ctx.Channel
 	cell := ctx.Cell
 	log := ctx.Log
+	flow:=ctx.Flow
+	record := helpers.NewRecording(flow.User)
+	_,recordErr:=record.InitiateRecordingForChannel(outboundChannel)
+
+	if recordErr != nil {
+		log.Error("error starting recording: " + recordErr.Error())
+		return
+	}
+
+
+
 	log.Debug("Dial source link count: " + strconv.Itoa( len( cell.SourceLinks )))
 	log.Debug("Dial target link count: " + strconv.Itoa( len( cell.TargetLinks )))
 
@@ -53,6 +64,7 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 				 return
 			case <-endSub.Events():
 				log.Debug("ended call..")
+				record.Stop()
 				return
 			case <-rootEndSub.Events():
 				log.Debug("root inded call..")
