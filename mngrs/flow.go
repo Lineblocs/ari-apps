@@ -8,6 +8,10 @@ import (
 	"lineblocs.com/processor/utils"
 )
 
+type BaseManager interface {
+	StartProcessing()
+}
+
 func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string] string, cell *types.Cell, runner *types.Runner) {
 	log := utils.GetLogger()
 	log.Debug("processing cell type " + cell.Cell.Type)
@@ -29,44 +33,39 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 		runner,
 		lineChannel)
 	// execute it
+	var mngr BaseManager
 	switch ; cell.Cell.Type {
 		case "devs.LaunchModel":
 			for _, link := range cell.SourceLinks {
 				go startProcessingFlow( cl, ctx, flow, lineChannel, eventVars, link.Target, runner)
 			}
+			return
 		case "devs.SwitchModel":
-			mngr := NewSwitchManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewSwitchManager(lineCtx, flow)
 		case "devs.BridgeModel":
-			mngr := NewBridgeManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewBridgeManager(lineCtx, flow)
 		case "devs.PlaybackModel":
-			mngr := NewPlaybackManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewPlaybackManager(lineCtx, flow)
 		case "devs.ProcessInputModel":
-			mngr := NewInputManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewInputManager(lineCtx, flow)
 		case "devs.DialModel":
-			mngr := NewDialManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewDialManager(lineCtx, flow)
 		case "devs.SetVariablesModel":
-			mngr := NewSetVariablesManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewSetVariablesManager(lineCtx, flow)
 		case "devs.WaitModel":
-			mngr := NewWaitManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewWaitManager(lineCtx, flow)
 		case "devs.SendDigitsModel":
-			mngr := NewSendDigitsManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewSendDigitsManager(lineCtx, flow)
 		case "devs.MacroModel":
-			mngr := NewMacroManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewMacroManager(lineCtx, flow)
 		case "devs.ConferenceModel":
-			mngr := NewConferenceManager(lineCtx, flow)
-			mngr.StartProcessing()
+			mngr = NewConferenceManager(lineCtx, flow)
 		default:
+			log.Info("unknown type of cell..")
+			return
 
 	}
+	mngr.StartProcessing()
 
 	log.Debug("waiting to receive from channel...")
 	for {
