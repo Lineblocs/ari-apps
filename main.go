@@ -602,9 +602,9 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn")
 
 	case "OUTGOING_PROXY_MEDIA":
-		log.info("media service call..")
+		log.Info("media service call..")
 
 	default:
-		log.info("unknown call type...")
+		log.Info("unknown call type...")
 	}
 }

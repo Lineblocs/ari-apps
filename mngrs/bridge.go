@@ -407,6 +407,7 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 
 	vars := make( map[string] string )
 	go ProcessFlow( client, man.ManagerContext.Context, flow, channel, vars, flow.Cells[ 0 ])
+}
 
 func (man *BridgeManager) startCallMerge(callType string) {
 	ctx := man.ManagerContext
