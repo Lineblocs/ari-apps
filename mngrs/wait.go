@@ -30,9 +30,9 @@ func (man *WaitManager) StartProcessing() {
 	model := cell.Model
 	completed, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Completed")
 
-	val, err := strconv.Atoi( model.Data["wait_seconds"].ValueStr )
+	val, err := strconv.Atoi( model.Data["wait_seconds"].(types.ModelDataStr).Value )
 	if err != nil {
-		log.Debug("could not parse wait timeout of: " + model.Data["wait_seconds"].ValueStr )
+		log.Debug("could not parse wait timeout of: " + model.Data["wait_seconds"].(types.ModelDataStr).Value )
 		man.ManagerContext.RecvChannel <- nil
 		return
 	}

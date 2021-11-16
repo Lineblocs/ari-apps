@@ -64,10 +64,13 @@ func (man *BridgeManager) addAllRequestedCalls(bridge *types.LineBridge) {
 	cell := ctx.Cell
 	data := cell.Model.Data
 	extras := data["extra_call_ids"]
-
+	if extras == nil {
+		return
+	}
+	callIds := extras.(types.ModelDataStr)
 	log.Debug("looking up requested channels")
-	if extras.ValueStr != "" {
-		ids := strings.Split(extras.ValueStr, ",")
+	if callIds.Value != "" {
+		ids := strings.Split(callIds.Value, ",")
 		for _, id := range ids {
 			log.Debug("adding requested channel: " + id)
 			call, err := api.FetchCall( id )
@@ -211,8 +214,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 	flow := ctx.Flow
 	user := flow.User
 	log.Debug("startOutboundCall called..")
-
-	callerId := utils.DetermineCallerId( flow.RootCall, model.Data["caller_id"].ValueStr )
+	callerId := utils.DetermineCallerId( flow.RootCall, model.Data["caller_id"] )
 	log.Debug("caller ID was set to: " + callerId)
 
 	valid, err := api.VerifyCallerId(strconv.Itoa( user.Workspace.Id ), callerId)
@@ -225,21 +227,17 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 		return
 	}
 
-	numberToCall := utils.DetermineNumberToCall( model.Data )
+	numberToCall, err := utils.DetermineNumberToCall( model.Data )
+	if err != nil {
+		log.Debug("verify error: " + err.Error())
+		return
+	}
 	//key := src.New(ari.ChannelKey, rid.New(rid.Channel))
 
 	log.Debug("Calling: " + numberToCall)
 
-	timeout := utils.ParseRingTimeout( model.Data["timeout"].ValueStr )
-
+	timeout := utils.ParseRingTimeout( model.Data["timeout"] )
 	outChannel := types.LineChannel{}
-
-	/*
-	src := channel.Channel.Key()
-
-	key := src.New(ari.ChannelKey, rid.New(rid.Channel))
-	outboundChannel := ari.NewChannelHandle( key, ctx.Client.Channel(), nil )
-	*/
 	outboundChannel, err := ctx.Client.Channel().Create(nil, utils.CreateChannelRequest( numberToCall )	)
 
 	if err != nil {
@@ -250,11 +248,12 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 	domain := user.Workspace.Domain
 
 	var mappedCallType string
-	if callType == "Extension" {
+	switch ; callType {
+	case "Extension":
 		mappedCallType = "extension"
-	} else if callType == "Phone Number" {
+	case "Phone Number":
 		mappedCallType = "pstn"
-	}
+		}
 	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType)
 	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 
@@ -353,19 +352,19 @@ func (man *BridgeManager) StartProcessing() {
 
 	// create the bridge
 
-	callType := data["call_type"]
+	callType := data["call_type"].(types.ModelDataStr)
 
-	log.Debug("processing call type: " + callType.ValueStr)
-	if callType.ValueStr == "Extension" || callType.ValueStr == "Phone Number" {
-		man.startSimpleCall(callType.ValueStr)
+	log.Debug("processing call type: " + callType.Value)
+	if callType.Value == "Extension" || callType.Value == "Phone Number" {
+		man.startSimpleCall(callType.Value)
 
-	} else if callType.ValueStr == "ExtensionFlow" {
-		extension := data["extension"].ValueStr
+	} else if callType.Value == "ExtensionFlow" {
+		extension := data["extension"].(types.ModelDataStr).Value
 		man.initiateExtFlow(user, extension)
-	} else if callType.ValueStr == "Follow Me" {
-	} else if callType.ValueStr == "Queue" {
-	} else if callType.ValueStr == "Merge Calls" {
-		man.startCallMerge(callType.ValueStr)
+	} else if callType.Value == "Follow Me" {
+	} else if callType.Value == "Queue" {
+	} else if callType.Value == "Merge Calls" {
+		man.startCallMerge(callType.Value)
 	}
 
 
@@ -408,16 +407,6 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 
 	vars := make( map[string] string )
 	go ProcessFlow( client, man.ManagerContext.Context, flow, channel, vars, flow.Cells[ 0 ])
-	/*
-	for {
-		select {
-			case <-ctx.Done():
-				return
-		}
-	}
-	*/
-
-}
 
 func (man *BridgeManager) startCallMerge(callType string) {
 	ctx := man.ManagerContext

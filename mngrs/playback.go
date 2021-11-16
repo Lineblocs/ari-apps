@@ -24,32 +24,32 @@ func (man *PlaybackManager) StartProcessing() {
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	data := cell.Model.Data
-	playbackType := data["playback_type"].ValueStr
+	playbackType := data["playback_type"].(types.ModelDataStr).Value
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 
-	if playbackType == "Say" {
+	switch ;playbackType { 
+		case "Say":
 
 
-		log.Debug("processing TTS")
-		file, err := utils.StartTTS(data["text_to_say"].ValueStr,
-			data["text_gender"].ValueStr,
-			data["voice"].ValueStr,
-			data["text_language"].ValueStr,
-		)
-		if err != nil {
-			log.Error("error downloading: " + err.Error())
-		}
+			log.Debug("processing TTS")
+			file, err := utils.StartTTS(data["text_to_say"].(types.ModelDataStr).Value,
+				data["text_gender"].(types.ModelDataStr).Value,
+				data["voice"].(types.ModelDataStr).Value,
+				data["text_language"].(types.ModelDataStr).Value)
+			if err != nil {
+				log.Error("error downloading: " + err.Error())
+			}
 
-		go man.beginPrompt(file)
-	} else if playbackType == "Play" {
+			go man.beginPrompt(file)
+		case "Play":
 
-		log.Debug("processing TTS")
-		file, err := utils.DownloadFile( flow, data["url_audio"].ValueStr )
+			log.Debug("processing TTS")
+			file, err := utils.DownloadFile( flow, data["url_audio"].(types.ModelDataStr).Value)
 
-		if err != nil {
-			log.Error("error downloading: " + err.Error())
-		}
-		go man.beginPrompt(file)
+			if err != nil {
+				log.Error("error downloading: " + err.Error())
+			}
+			go man.beginPrompt(file)
 
 	}
 

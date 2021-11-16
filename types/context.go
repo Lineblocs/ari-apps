@@ -40,19 +40,25 @@ func convertVariableValues(value string, lineFlow *Flow) (string) {
     }
 	return value
 }
-func processInterpolation( value* ModelData, lineFlow *Flow) {
-
-	if value.IsStr {
-		value.ValueStr = convertVariableValues(value.ValueStr, lineFlow)
-	} else if value.IsObj {
-		for k, v := range value.ValueObj {
-			value.ValueObj[ k ] = convertVariableValues(v, lineFlow)
+func processInterpolation( i ModelData, lineFlow *Flow) {
+	itemStr,ok := i.(ModelDataStr)
+	if ok {
+		itemStr.Value = convertVariableValues(itemStr.Value, lineFlow)
+		return
+	}
+	itemObj,ok := i.(ModelDataObj)
+	if ok {
+		for k, v := range itemObj.Value {
+			itemObj.Value[ k ] = convertVariableValues(v, lineFlow)
 		}
-
-	} else if value.IsArray {
-		for k, v := range value.ValueArr {
-			value.ValueArr[ k ] = convertVariableValues(v, lineFlow)
+		return
+	}
+	itemArr,ok := i.(ModelDataArr)
+	if ok {
+		for k, v := range itemArr.Value {
+			itemArr.Value[ k ] = convertVariableValues(v, lineFlow)
 		}
+		return
 	}
 }
 func processAllInterpolations( data map[string] ModelData, lineFlow *Flow) {

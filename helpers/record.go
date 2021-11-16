@@ -36,7 +36,7 @@ func (r *Record) createAPIResource() (string, error) {
 	user := r.User
 	uniq, err := uuid.NewUUID()
 	if err != nil {
-		fmt.Printf("fail to create UUID. err: %s", err.Error())
+		fmt.Printf("recording fail to create UUID. err: %s\r\n", err.Error())
 		return "", err
 	}
 
@@ -52,12 +52,16 @@ func (r *Record) createAPIResource() (string, error) {
 
 	body, err := json.Marshal( params )
 	if err != nil {
-		fmt.Printf( "error occured: %s", err.Error() )
+		fmt.Printf( "error occured: %s\r\n", err.Error() )
 		return "", err
 	}
 
 	fmt.Println("creating recording call...")
 	resp, err := api.SendHttpRequest( "/recording/createRecording", body )
+	if err != nil {
+		fmt.Printf( "error occured: %s\r\n", err.Error() )
+		return "", err
+	}
 	_ = resp.Headers.Get("x-recording-id")
 	return id, nil
 }
@@ -70,7 +74,7 @@ func (r *Record) InitiateRecordingForBridge(bridge *types.LineBridge) (string, e
 	defer cancel()
 	id, err := r.createAPIResource()
 	if err != nil {
-		fmt.Printf("failed to record. err: %s", err.Error())
+		fmt.Printf("failed to record. err: %s\r\n", err.Error())
 		return "", err
 	}
 
@@ -78,7 +82,7 @@ func (r *Record) InitiateRecordingForBridge(bridge *types.LineBridge) (string, e
 	opts := &ari.RecordingOptions{}
 	hndl, err := bridge.Bridge.Record(key.ID, opts)
 	if err != nil {
-		fmt.Printf("failed to record. err: %s", err.Error())
+		fmt.Printf("failed to record. err: %s\r\n", err.Error())
 		return "",err
 	}
 	r.Handle = hndl
@@ -100,7 +104,7 @@ func (r *Record) InitiateRecordingForChannel(channel *types.LineChannel) (string
 	opts := &ari.RecordingOptions{}
 	hndl, err := channel.Channel.Record(key.ID, opts)
 	if err != nil {
-		fmt.Printf("failed to record. err: %s", err.Error())
+		fmt.Printf("failed to record. err: %s\r\n", err.Error())
 		return "",err
 	}
 

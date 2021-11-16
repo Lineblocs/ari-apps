@@ -38,18 +38,21 @@ type Cell struct {
 	AttachedCall *Call
 }
 
-type ModelData struct {
-	Key string
-	ValueStr string
-	ValueArr []string
-	ValueObj map[string] string
-	ValueBool bool
-	IsArray bool
-	IsObj bool
-	IsStr bool
-	IsBool bool
+type ModelData interface {
 }
 
+type ModelDataStr struct {
+	Value string
+}
+type ModelDataBool struct {
+	Value bool
+}
+type ModelDataArr struct {
+	Value []string
+}
+type ModelDataObj struct {
+	Value map[string] string
+}
 type ModelLink struct {
 	Type string `json:"type"`
 	Condition string `json:"condition"`
@@ -122,34 +125,40 @@ func createCellData(cell *Cell, flow *Flow, channel *LineChannel) {
 			//json.Unmarshal([]byte(unparsedModel.Data), &modelData)
 
 			for key, v := range modelData {
-				item := ModelData{}
+				//var item ModelData
+				//item = ModelData{}
  				typeOfValue := fmt.Sprintf("%s", reflect.TypeOf(v))
 
 				fmt.Printf("parsing type %s\r\n", typeOfValue)
+					fmt.Printf("setting key: %s\r\n", key)
 				switch ; typeOfValue {
 					case "[]string":
 						// it's an array
-
-						item.ValueArr = v.([]string)
+						value := v.([]string)
+						model.Data[key]= ModelDataArr{Value: value}
 						//item.ValueArr = v
-						item.IsArray = true
+						//item.IsArray = true
 
 					case "map[string]string":
 						// it's an object
 						fmt.Println("converting obj")
-						item.ValueObj = v.(map[string]string)
+						value := v.(map[string]string)
+						model.Data[key]=ModelDataObj{Value: value}
 						//item.ValueObj = v
-						item.IsObj = true
+						//item.IsObj = true
 					case "string":
 						// it's something else
-						item.ValueStr = v.(string)
-						item.IsStr = true
+						//item.ValueStr = v.(string)
+						//item.IsStr = true
+						value := v.(string)
+						model.Data[key]=ModelDataStr{Value: value}
 					case "boolean":
 						// it's something else
-						item.ValueBool = v.(bool)
-						item.IsBool = true
+						//item.ValueBool = v.(bool)
+						//item.IsBool = true
+						value := v.(bool)
+						model.Data[key]=ModelDataBool{Value: value}
 					}
-					model.Data[key] = item
 
 			}
 		}

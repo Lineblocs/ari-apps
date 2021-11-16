@@ -77,8 +77,8 @@ func (man *MacroManager) executeMacro() {
 	model := cell.Model
 	log.Debug("running macro script..");
 
-	function := model.Data["function"].ValueStr
-	params := model.Data["params"].ValueObj
+	function := model.Data["function"].(types.ModelDataStr).Value
+	params := model.Data["params"].(types.ModelDataObj).Value
 
 	completed, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Completed")
 	errorLink, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Error")

@@ -102,7 +102,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	log.Debug("startOutboundCall called..")
 
-	callerId := utils.DetermineCallerId( flow.RootCall, model.Data["caller_id"].ValueStr )
+	callerId := utils.DetermineCallerId( flow.RootCall, model.Data["caller_id"] )
 	log.Debug("caller ID was set to: " + callerId)
 
 	valid, err := api.VerifyCallerId(strconv.Itoa( user.Workspace.Id ), callerId)
@@ -115,20 +115,18 @@ func (man *DialManager) startOutboundCall(callType string) {
 		return
 	}
 
-	numberToCall := utils.DetermineNumberToCall( model.Data )
+	numberToCall,err := utils.DetermineNumberToCall( model.Data )
+	if err != nil {
+		log.Debug("verify error: " + err.Error())
+		return
+	}
 	//key := src.New(ari.ChannelKey, rid.New(rid.Channel))
 
 	log.Debug("Calling: " + numberToCall)
 
-	timeout := utils.ParseRingTimeout( model.Data["timeout"].ValueStr )
+	timeout := utils.ParseRingTimeout( model.Data["timeout"] )
 
 	outChannel := types.LineChannel{}
-	/*
-	src := channel.Channel.Key()
-
-	key := src.New(ari.ChannelKey, rid.New(rid.Channel))
-	outboundChannel := ari.NewChannelHandle( key, ctx.Client.Channel(), nil )
-	*/
 	outboundChannel, err := ctx.Client.Channel().Create(nil, utils.CreateChannelRequest( numberToCall )	)
 
 	if err != nil {
@@ -139,11 +137,13 @@ func (man *DialManager) startOutboundCall(callType string) {
 	domain := user.Workspace.Domain
 
 	var mappedCallType string
-	if callType == "Extension" {
+
+	switch ; callType {
+	case "Extension":
 		mappedCallType = "extension"
-	} else if callType == "Phone Number" {
+	case "Phone Number":
 		mappedCallType = "pstn"
-	}
+		}
 	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType)
 	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 
@@ -212,17 +212,19 @@ func (man *DialManager) StartProcessing() {
 	data := cell.Model.Data
 	// create the bridge
 
-	callType := data["call_type"]
+	callType := data["call_type"].(types.ModelDataStr)
 	_ = helpers.NewRecording(flow.User)
 
-	log.Debug("processing call type: " + callType.ValueStr)
+	log.Debug("processing call type: " + callType.Value)
 	log.Debug( "Creating DIAL... ")
 
 	log.Info("channel added to bridge")
 
-
-	if callType.ValueStr == "Extension" || callType.ValueStr == "Phone Number" {
-		man.startOutboundCall(callType.ValueStr) 
-	}
+	switch ; callType.Value {
+	case "Extension":
+		man.startOutboundCall(callType.Value) 
+	case "Phone Number":
+		man.startOutboundCall(callType.Value) 
+		}
 }
 

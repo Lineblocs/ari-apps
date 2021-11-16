@@ -43,6 +43,7 @@ func logFormattedMsg(msg string) {
 
 func createARIConnection(connectCtx context.Context) (ari.Client, error) {
  	log := utils.GetLogger()
+ 	log.Info("Connecting to: " + os.Getenv("ARI_URL"))
        cl, err := native.Connect(&native.Options{
                Application:  ariApp,
                Username:     os.Getenv("ARI_USERNAME"),
@@ -305,14 +306,6 @@ func main() {
 	native.Logger = log
 
 	log.Info("Connecting")
-
-	/*
-	 err := godotenv.Load()
-	if err != nil {
-		log.Info("Error loading .env file")
-		return
-	}
-	*/
 	ctx, cancel := context.WithCancel(context.Background())
 	connectCtx, cancel2 := context.WithCancel(context.Background())
 	defer cancel()
@@ -488,16 +481,15 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 
 	log.Debug("received action: " + action)
 	log.Debug("EXTEN: " + exten)
-	if action == "h" { // dont handle it
+	switch ; action {
+	case "h":
 		fmt.Println("Received h handler - not processing")
-		return
-	} else if action == "DID_DIAL" {
+	case "DID_DIAL":
 		fmt.Println("Already dialed - not processing")
 		return
-	} else if action == "DID_DIAL_2" {
+	case "DID_DIAL_2":
 		fmt.Println("Already dialed - not processing")
-		return
-	} else if action == "INCOMING_CALL" {
+	case "INCOMING_CALL":
 		body, err := api.SendGetRequest("/user/getDIDNumberData", vals)
 
 		if err != nil {
@@ -556,7 +548,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		callerId := event.Args[ 2 ]
 		fmt.Printf("Starting stasis with extension: %s, caller id: %s", exten, callerId)
 		go processIncomingCall( cl, ctx, flow, &lineChannel, exten, callerId )
-	} else if action == "OUTGOING_PROXY_ENDPOINT" {
+	case  "OUTGOING_PROXY_ENDPOINT":
 
 		callerId := event.Args[ 2 ]
 		domain := event.Args[ 3 ]
@@ -576,10 +568,11 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
+		fmt.Printf("Calling %s\r\n", exten)
 		h.Answer()
 			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension")
 
-	} else if action == "OUTGOING_PROXY" {
+	case "OUTGOING_PROXY":
 		callerId := event.Args[ 2 ]
 		domain := event.Args[ 3 ]
 
@@ -608,26 +601,10 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		h.Answer()
 			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn")
 
-	} else if action == "OUTGOING_PROXY_MEDIA" {
+	case "OUTGOING_PROXY_MEDIA":
+		log.info("media service call..")
 
+	default:
+		log.info("unknown call type...")
 	}
-	/*
-	if err := h.Answer(); err != nil {
-		log.Error("failed to answer call", "error", err)
-		// return
-	}
-
-	if err := ensureBridge(ctx, cl, h.Key()); err != nil {
-		log.Error("failed to manage bridge", "error", err)
-		return
-	}
-
-	if err := bridge.AddChannel(h.Key().ID); err != nil {
-		log.Error("failed to add channel to bridge", "error", err)
-		return
-	}
-
-	log.Info("channel added to bridge")
-	*/
-	return
 }

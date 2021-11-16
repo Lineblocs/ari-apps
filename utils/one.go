@@ -40,12 +40,17 @@ type ConfCache struct {
 func GetPublicIp( ) string {
 	return "0.0.0.0"
 }
-func DetermineCallerId( call *types.Call, providedVal string ) (string) {
-	if providedVal == "" {
+func DetermineCallerId( call *types.Call, data types.ModelData  ) (string) {
+	item,ok := data.(types.ModelDataStr)
+
+	if !ok {
+		return call.Params.From
+	}
+	if item.Value == "" {
 		// default caller id
 		return call.Params.From
 	}
-	return providedVal
+	return item.Value
 }
 
 func CheckFreeTrial( plan string ) bool {
@@ -203,15 +208,27 @@ func CreateOriginateRequest2(callerId string, numberToCall string) (ari.Originat
 		AppArgs: "DID_DIAL_2," }
 }
 
-func DetermineNumberToCall(data map[string]types.ModelData) (string) {
-	callType := data["call_type"]
-
-	if callType.ValueStr == "Extension" {
-		return data["extension"].ValueStr
-	} else if callType.ValueStr == "Phone Number" {
-		return data["number_to_call"].ValueStr
+func DetermineNumberToCall(data map[string]types.ModelData) (string, error) {
+	callType, ok := data["call_type"].(types.ModelDataStr)
+	if !ok {
+		return "", errors.New("Could not get call type")
 	}
-	return ""
+
+	switch ; callType.Value {
+	case "Extension":
+		ext, ok := data["extension"].(types.ModelDataStr)
+		if !ok {
+			return "", errors.New("Could not get ext")
+		}
+		return ext.Value,nil
+	case "Phone Number":
+		ext, ok := data["number_to_call"].(types.ModelDataStr)
+		if !ok {
+			return "", errors.New("Could not get number")
+		}
+		return ext.Value,nil
+	}
+	return "", errors.New("Unknown call type")
 }
 
 func SafeHangup(lineChannel *types.LineChannel) {
@@ -452,13 +469,6 @@ func SaveLiveRecording(result *record.Result) (string, error) {
 		return "", err
 	}
 
-	/*
-	data, err  := result.File()
-	if err != nil {
-		log.Error(err.Error())
-		return "", err
-	}
-	*/
 	data := []byte("")
  	filename := (uniq.String() + ".wav")
 	fullPathToFile := folder + filename
@@ -508,8 +518,13 @@ func RemoveChannelFromBridge( bridge *types.LineBridge, channel *types.LineChann
 	bridge.Channels =channels
 }
 
-func ParseRingTimeout( value string ) (int) {
-	result, err := strconv.Atoi( value )
+func ParseRingTimeout( value types.ModelData ) (int) {
+
+	item,ok := value.(types.ModelDataStr)
+	if !ok {
+		return 30
+	}
+	result, err := strconv.Atoi( item.Value )
 
 	// use default
 	if err != nil {

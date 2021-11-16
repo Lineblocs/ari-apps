@@ -31,8 +31,8 @@ func (man *SwitchManager) startTestForCondition() {
 	data := cell.Model.Data
 	links := cell.Model.Links
 	sourceLinks := cell.SourceLinks
-	before := data["test_before_interpolations"].ValueStr
-	test := data["test"].ValueStr
+	before := data["test_before_interpolations"].(types.ModelDataStr).Value
+	test := data["test"].(types.ModelDataStr).Value
 	var result string
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 

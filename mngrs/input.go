@@ -27,21 +27,21 @@ func (man *InputManager) StartProcessing() {
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	data := cell.Model.Data
-	playbackType := data["playback_type"].ValueStr
+	playbackType := data["playback_type"].(types.ModelDataStr).Value
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 
-	stopTimeout, err := strconv.ParseFloat( data["stop_timeout"].ValueStr, 64 )
+	stopTimeout, err := strconv.ParseFloat( data["stop_timeout"].(types.ModelDataStr).Value, 64 )
 
 	if err != nil {
-		log.Debug("error parsing stop timeout. value was:  " + data["stop_timeout"].ValueStr)
+		log.Debug("error parsing stop timeout. value was:  " + data["stop_timeout"].(types.ModelDataStr).Value)
 		return
 	}
 
-	maxDigits, err := strconv.Atoi( data["max_digits"].ValueStr )
+	maxDigits, err := strconv.Atoi( data["max_digits"].(types.ModelDataStr).Value )
 
-	stopGatherOnKeypress := data["stop_gather_on_keypress"].ValueBool
-	keypressKeyStop := data["keypress_key_stop"].ValueStr
+	stopGatherOnKeypress := data["stop_gather_on_keypress"].(types.ModelDataBool).Value
+	keypressKeyStop := data["keypress_key_stop"].(types.ModelDataStr).Value
 	stopChannel := make( chan bool, 1 )
  	wg1 := new(sync.WaitGroup)
 	wg1.Add(1)
@@ -49,33 +49,34 @@ func (man *InputManager) StartProcessing() {
 	wg1.Wait()
 
 	if err != nil {
-		log.Debug("error parsing max digits. value was:  " + data["max_digits"].ValueStr)
+		log.Debug("error parsing max digits. value was:  " + data["max_digits"].(types.ModelDataStr).Value)
 		return
 	}
 
-	if playbackType == "Say" {
+	switch ;playbackType { 
+		case "Say":
 
 
-		log.Debug("processing TTS")
-		file, err := utils.StartTTS( data["text_to_say"].ValueStr,
-			data["text_gender"].ValueStr,
-			data["voice"].ValueStr,
-			data["text_language"].ValueStr,
-		)
-		if err != nil {
-			log.Error("error downloading: " + err.Error())
-		}
+			log.Debug("processing TTS")
+			file, err := utils.StartTTS( data["text_to_say"].(types.ModelDataStr).Value,
+				data["text_gender"].(types.ModelDataStr).Value,
+				data["voice"].(types.ModelDataStr).Value,
+				data["text_language"].(types.ModelDataStr).Value,
+			)
+			if err != nil {
+				log.Error("error downloading: " + err.Error())
+			}
 
-		go man.beginPrompt(file, stopChannel)
-	} else if playbackType == "Play" {
+			go man.beginPrompt(file, stopChannel)
+		case "Play":
 
-		log.Debug("processing TTS")
-		file, err := utils.DownloadFile( flow, data["url_audio"].ValueStr )
+			log.Debug("processing TTS")
+			file, err := utils.DownloadFile( flow, data["url_audio"].(types.ModelDataStr).Value)
 
-		if err != nil {
-			log.Error("error downloading: " + err.Error())
-		}
-		go man.beginPrompt(file, stopChannel)
+			if err != nil {
+				log.Error("error downloading: " + err.Error())
+			}
+			go man.beginPrompt(file, stopChannel)
 
 	}
 }
