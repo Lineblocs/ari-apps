@@ -94,8 +94,6 @@ func (man *MacroManager) executeMacro() {
 		}
 	}
 
-	err := man.startGRPCAndRunMacro(foundFn, params)
-
 	if foundFn == nil {
 		log.Debug("could not find macro function...")
 		resp := types.ManagerResponse{
@@ -104,6 +102,8 @@ func (man *MacroManager) executeMacro() {
 		man.ManagerContext.RecvChannel <- &resp
 		return
 	}
+
+	err := man.startGRPCAndRunMacro(foundFn, params)
 	//sEnc := b64.StdEncoding.EncodeToString([]byte(foundFn.CompiledCode))
 	//err := man.initializeK8sAndExecute(sEnc)
 
