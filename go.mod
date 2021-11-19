@@ -3,7 +3,9 @@ module lineblocs.com/processor
 go 1.17
 
 require (
+	cloud.google.com/go/speech v1.0.0
 	cloud.google.com/go/texttospeech v1.0.0
+	github.com/CyCoreSystems/ari-proxy/v5 v5.2.2
 	github.com/CyCoreSystems/ari/v5 v5.2.0
 	github.com/aws/aws-sdk-go v1.41.7
 	github.com/go-redis/redis/v8 v8.11.4
@@ -22,7 +24,6 @@ require (
 
 require (
 	cloud.google.com/go v0.97.0 // indirect
-	cloud.google.com/go/speech v1.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -44,6 +45,9 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
+	github.com/nats-io/nats.go v1.8.1 // indirect
+	github.com/nats-io/nkeys v0.0.2 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/u2takey/go-utils v0.0.0-20210821132353-e90f7c6bacb5 // indirect
@@ -70,4 +74,6 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace github.com/CyCoreSystems/ari/v5 => github.com/nadirhamid/ari/v5 v5.2.1
+replace github.com/CyCoreSystems/ari/v5 => github.com/nadirhamid/ari/v5 v5.2.5
+
+replace github.com/CyCoreSystems/ari-proxy/v5 => github.com/nadirhamid/ari-proxy/v5 v5.2.4

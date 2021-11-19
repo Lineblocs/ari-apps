@@ -721,7 +721,7 @@ func (s *Server) ChannelRecord(ctx context.Context, req *GenericChannelReq) (*Ge
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording( user )
+	recording := helpers.NewRecording( user,nil )
 	id, err :=recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
@@ -850,7 +850,7 @@ func (s *Server) BridgeRecord(ctx context.Context, req *GenericBridgeReq) (*Gene
 	}
 
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording( user )
+	recording := helpers.NewRecording( user,nil )
 	id, err := recording.InitiateRecordingForBridge(bridge)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
@@ -999,7 +999,7 @@ func (s *Server) RecordingStop(ctx context.Context, req *RecordingRequest) (*Rec
 	}
 
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording( user )
+	recording := helpers.NewRecording( user,nil )
 	go recording.Stop()
 	s.dispatchEvent(func() {
 		// send to channel

@@ -93,7 +93,8 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	cell := ctx.Cell
 	channel := ctx.Channel
 	log := ctx.Log
-	record := helpers.NewRecording(flow.User)
+	record := helpers.NewRecording(flow.User,nil)
+	//_,recordErr:=record.InitiateRecordingForBridge(bridge)
 	_,recordErr:=record.InitiateRecordingForBridge(bridge)
 	next, _ := utils.FindLinkByName( cell.TargetLinks, "source", "Connected Call Ended")
 

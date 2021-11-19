@@ -23,7 +23,7 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 	cell := ctx.Cell
 	log := ctx.Log
 	flow:=ctx.Flow
-	record := helpers.NewRecording(flow.User)
+	record := helpers.NewRecording(flow.User,nil)
 	_,recordErr:=record.InitiateRecordingForChannel(outboundChannel)
 
 	if recordErr != nil {
@@ -220,12 +220,11 @@ func (man *DialManager) StartProcessing() {
 	log := man.ManagerContext.Log
 
 	cell := man.ManagerContext.Cell
-	flow := man.ManagerContext.Flow
+	//flow := man.ManagerContext.Flow
 	data := cell.Model.Data
 	// create the bridge
 
 	callType := data["call_type"].(types.ModelDataStr)
-	_ = helpers.NewRecording(flow.User)
 
 	log.Debug("processing call type: " + callType.Value)
 	log.Debug( "Creating DIAL... ")

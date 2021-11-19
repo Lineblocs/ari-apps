@@ -176,6 +176,12 @@ func GetSIPProxy() (string) {
 	return os.Getenv("PROXY_HOST")
 }
 
+func GetARIHost() (string) {
+	return os.Getenv("ARI_HOST")
+}
+
+
+
 func CreateChannelRequest(numberToCall string) (ari.ChannelCreateRequest) {
  	return ari.ChannelCreateRequest{
 		Endpoint: "SIP/" + numberToCall + "@" + GetSIPProxy(),

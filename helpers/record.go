@@ -6,6 +6,7 @@ import (
 
 	"lineblocs.com/processor/api"
 	"lineblocs.com/processor/types"
+	"lineblocs.com/processor/utils"
 	"github.com/google/uuid"
 	"github.com/CyCoreSystems/ari/v5"
 )
@@ -14,26 +15,30 @@ type Record struct {
 	Bridge *types.LineBridge
 	Channel *types.LineChannel
 	User *types.User
-	Call *types.Call
+	CallId *int
 	Handle *ari.LiveRecordingHandle
 }
 
 type RecordingParams struct {
 	UserId int `json:"user_id"`
+	CallId *int `json:"call_id"`
 	Tag string `json:"tag"`
 	Status string `json:"status"`
 	WorkspaceId int `json:"workspace_id"`
+	StorageId string `json:"storage_id"`
+	StorageServerIp string `json:"storage_server_ip"`
 }
 
 
-func NewRecording(user *types.User) (*Record) {
+func NewRecording(user *types.User, callId *int) (*Record) {
 	record := Record{
-		User: user }
+		User: user, CallId:callId }
 
 	return &record
 }
 func (r *Record) createAPIResource() (string, error) {
 	user := r.User
+	callId := r.CallId
 	uniq, err := uuid.NewUUID()
 	if err != nil {
 		fmt.Printf("recording fail to create UUID. err: %s\r\n", err.Error())
@@ -45,9 +50,12 @@ func (r *Record) createAPIResource() (string, error) {
 	id := uniq.String()
 	params := RecordingParams{
 		UserId: user.Id,
+		CallId:callId,
 		Tag: "",
 		Status: "started",
-		WorkspaceId: user.Workspace.Id, }
+		WorkspaceId: user.Workspace.Id,
+		StorageId: id,
+		StorageServerIp: utils.GetARIHost()}
 
 
 	body, err := json.Marshal( params )
@@ -79,7 +87,7 @@ func (r *Record) InitiateRecordingForBridge(bridge *types.LineBridge) (string, e
 	}
 
 	key := ari.NewKey(ari.LiveRecordingKey, id)
-	opts := &ari.RecordingOptions{}
+	opts := &ari.RecordingOptions{ Format: "wav" }
 	hndl, err := bridge.Bridge.Record(key.ID, opts)
 	if err != nil {
 		fmt.Printf("failed to record. err: %s\r\n", err.Error())
@@ -101,7 +109,7 @@ func (r *Record) InitiateRecordingForChannel(channel *types.LineChannel) (string
 	}
 
 	key := ari.NewKey(ari.LiveRecordingKey, id)
-	opts := &ari.RecordingOptions{}
+	opts := &ari.RecordingOptions{ Format: "wav" }
 	hndl, err := channel.Channel.Record(key.ID, opts)
 	if err != nil {
 		fmt.Printf("failed to record. err: %s\r\n", err.Error())

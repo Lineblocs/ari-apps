@@ -9,7 +9,7 @@ LABEL maintainer="Nadir Hamid <matrix.nad@gmail.com>"
 # Set the Current Working Directory inside the container
 WORKDIR /app
 
-RUN apt-get -y update && apt-get install -y bash netdiscover
+RUN apt-get -y update && apt-get install -y bash
 # Copy go mod and sum files
 COPY go.mod go.sum ./
 
@@ -30,6 +30,7 @@ RUN go build -o main main.go
 # Expose port 80 to the outside world (used for GRPC)
 EXPOSE 8018
 
-RUN ls -a /app/
+COPY ./netdiscover /bin/netdiscover
+
 # Command to run the executable
 ENTRYPOINT ["/bin/bash", "./entrypoint.sh"]

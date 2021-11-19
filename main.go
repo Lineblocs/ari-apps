@@ -15,6 +15,7 @@ import (
 	"github.com/rotisserie/eris"
 
 	"github.com/CyCoreSystems/ari/v5"
+	 "github.com/CyCoreSystems/ari-proxy/v5/client"
 	"github.com/CyCoreSystems/ari/v5/client/native"
 	"github.com/CyCoreSystems/ari/v5/rid"
 	"lineblocs.com/processor/grpc"
@@ -42,20 +43,35 @@ func logFormattedMsg(msg string) {
 
 
 func createARIConnection(connectCtx context.Context) (ari.Client, error) {
+	var err error
+	var cl ari.Client
+	var useProxy bool
  	log := utils.GetLogger()
  	log.Info("Connecting to: " + os.Getenv("ARI_URL"))
-       cl, err := native.Connect(&native.Options{
-               Application:  ariApp,
-               Username:     os.Getenv("ARI_USERNAME"),
-               Password:     os.Getenv("ARI_PASSWORD"),
-               URL:          os.Getenv("ARI_URL"),
-               WebsocketURL: os.Getenv("ARI_WSURL") })
-        if err != nil {
-               log.Error("Failed to build native ARI client", "error", err)
-               log.Error( "error occured: " + err.Error() )
-               return nil, err
-        }
-       return cl, err
+	proxy := os.Getenv("ARI_USE_PROXY")
+	if proxy != "" {
+		useProxy,err = strconv.ParseBool( proxy )
+		if err != nil {
+			return nil, err
+		}
+	}
+	ctx := context.Background()
+	 if useProxy {
+		log.Debug("Using ARI proxy!!!");
+		natsgw := os.Getenv("NATSGW_URL")
+	   cl, err := client.New(ctx,
+			client.WithApplication(ariApp),
+			client.WithURI(natsgw))
+		return cl, err
+	}
+	log.Info("Directly connecting to ARI server\r\n");
+	cl, err = native.Connect(&native.Options{
+			Application:  ariApp,
+			Username:     os.Getenv("ARI_USERNAME"),
+			Password:     os.Getenv("ARI_PASSWORD"),
+			URL:          os.Getenv("ARI_URL"),
+			WebsocketURL: os.Getenv("ARI_WSURL") })
+	return cl,err
  }
 
 func endBridgeCall( lineBridge *types.LineBridge ) {
@@ -303,7 +319,7 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 func main() {
  	log := utils.GetLogger()
 	// OPTIONAL: setup logging
-	native.Logger = log
+	//native.Logger = log
 
 	log.Info("Connecting")
 	ctx, cancel := context.WithCancel(context.Background())
@@ -313,14 +329,15 @@ func main() {
 	cl, err := createARIConnection(connectCtx)
 	log.Info("Connected to ARI")
 
+	if err != nil {
+		panic( err.Error ());
+		return
+	}
+
 	defer cl.Close()
 
 	log.Info("starting GRPC listener...")
 	go grpc.StartListener(cl)
-	err = utils.RunScriptInContext("var ttt = 1; var t1 = ttt * 2;");
-	if err != nil {
-		fmt.Println( err.Error ());
-	}
 	// setup app
 
 	log.Info("Starting listener app")
@@ -481,6 +498,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 
 	log.Debug("received action: " + action)
 	log.Debug("EXTEN: " + exten)
+
 	switch ; action {
 	case "h":
 		fmt.Println("Received h handler - not processing")
@@ -570,7 +588,12 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
 		fmt.Printf("Calling %s\r\n", exten)
 		h.Answer()
-			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension")
+		err = ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension")
+		if err != nil {
+			log.Debug("could not create bridge. error: " + err.Error())
+			return
+
+		}
 
 	case "OUTGOING_PROXY":
 		callerId := event.Args[ 2 ]
@@ -599,7 +622,12 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		}
 		fmt.Printf("setup caller id: " + callerInfo.CallerId)
 		h.Answer()
-			ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn")
+			err=ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn")
+if err != nil {
+			log.Debug("could not create bridge. error: " + err.Error())
+			return
+
+		}
 
 	case "OUTGOING_PROXY_MEDIA":
 		log.Info("media service call..")
