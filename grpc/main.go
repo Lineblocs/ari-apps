@@ -59,6 +59,7 @@ func ws(w http.ResponseWriter, r *http.Request) {
 	clientId := v.Get("clientId")
 	wsChan := createWSChan(clientId)
 	log.Printf("got connection from: %s\r\n", clientId)
+	log.Printf("Req: %s %s\n", r.Host, r.URL.Path) 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade:", err)

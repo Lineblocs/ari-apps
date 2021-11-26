@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"encoding/json"
 	"lineblocs.com/processor/types"
-	"lineblocs.com/processor/utils"
 )
 
 type APIResponse struct {
@@ -61,6 +60,23 @@ type CallResponse struct {
 }
 type ConferenceResponse struct {
 	Id string `json:"id"`
+}
+
+type SettingsResponse struct {
+  	AwsAccessKeyId string `json:"aws_access_key_id"`
+	AwsSecretAccessKey string `json:"aws_secret_access_key"`
+	AwsRegion string `json:"aws_region"`
+	StripePubKey string `json:"stripe_pub_key"`
+	StripePrivateKey string `json:"stripe_private_key"`
+	StripeTestPubKey string `json:"stripe_test_pub_key"`
+	StripeTestPrivateKey string `json:"stripe_test_private_key"`
+	StripeMode string `json:"stripe_mode"`
+	SmtpHost string `json:"smtp_host"`
+	SmtpPort string `json:"smtp_port"`
+	SmtpUser string `json:"smtp_user"`
+	SmtpPassword string `json:"smtp_password"`
+	SmtpTls string `json:"smtp_tls"`
+	GoogleServiceAccountJson string `json:"google_service_account_json"`
 }
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     url := "https://internals.lineblocs.com" + path
@@ -206,7 +222,8 @@ func UpdateCall( call *types.Call, status string ) (error) {
 	call.Ended = time.Now()
 	params := types.StatusParams{
 		CallId: call.CallId,
-		Ip: utils.GetPublicIp(),
+		//Ip: utils.GetPublicIp(),
+		Ip: "",
 		Status: status  }
 	body, err := json.Marshal( params )
 
@@ -343,4 +360,24 @@ func CreateConference(workspaceId int, name string) (*ConferenceResponse, error)
 
 	id := resp.Headers.Get("x-conference-id")
 	return &ConferenceResponse{Id: id}, nil
+}
+
+func GetSettings() (*SettingsResponse, error) {
+	fmt.Println("getting settings")
+
+	params := make(map[string]string)
+	res, err := SendGetRequest("/user/getSettings",params)
+	if err != nil {
+		return nil, err
+	}
+
+
+	var data SettingsResponse
+	err = json.Unmarshal( []byte(res), &data )
+	if err != nil {
+		fmt.Println("get settings err " + err.Error())
+		return nil, err
+	}
+
+	return &data, nil
 }

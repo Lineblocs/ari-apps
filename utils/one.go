@@ -14,19 +14,23 @@ import (
 	"fmt"
 	"path"
 	"lineblocs.com/processor/types"
+	"golang.org/x/oauth2/google"
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/inconshreveable/log15"
 	"github.com/google/uuid"
 	"github.com/u2takey/ffmpeg-go"
 	    "github.com/aws/aws-sdk-go/aws"
     "github.com/aws/aws-sdk-go/aws/session"
+    "github.com/aws/aws-sdk-go/aws/credentials"
 	    "github.com/aws/aws-sdk-go/service/s3/s3manager"
 		    "github.com/go-redis/redis/v8"
+			"google.golang.org/api/option"
 	        texttospeech "cloud.google.com/go/texttospeech/apiv1"
         texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
         speech "cloud.google.com/go/speech/apiv1"
         speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	"github.com/CyCoreSystems/ari/v5/ext/record"
+	"lineblocs.com/processor/api"
 )
 
 
@@ -269,10 +273,22 @@ func GetLogger() (log15.Logger) {
 	return log
 }
 
-func sendToAssetServer( path string, filename string ) (error, string) {
-	sess, err := session.NewSession(&aws.Config{ Region: aws.String(os.Getenv("AWS_DEFAULT_REGION")) })
+func sendToAssetServer( path string, filename string ) (string, error) {
+	settings, err := api.GetSettings()
 	if err != nil {
-		return fmt.Errorf("error occured: %v", err), ""
+		return "", err
+	}
+
+	creds := credentials.NewStaticCredentials(
+		settings.AwsAccessKeyId,
+		settings.AwsSecretAccessKey, "")
+
+	sess, err := session.NewSession(&aws.Config{
+    		Region:      aws.String(settings.AwsRegion),
+    		Credentials: creds,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error occured: %v", err)
 	}
 
 
@@ -281,7 +297,7 @@ func sendToAssetServer( path string, filename string ) (error, string) {
 
 	f, err  := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("failed to open file %q, %v", path, err), ""
+		return "", fmt.Errorf("failed to open file %q, %v", path, err)
 	}
 
 	bucket := "lineblocs"
@@ -295,14 +311,14 @@ func sendToAssetServer( path string, filename string ) (error, string) {
 		Body:   f,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to upload file, %v", err), ""
+		return "", fmt.Errorf("failed to upload file, %v", err)
 	}
 	fmt.Printf("file uploaded to, %s\n", aws.StringValue(&result.Location))
 
 
 	// send back link to media
 	url := "https://lineblocs.s3.ca-central-1.amazonaws.com/" + key
-	return nil, url
+	return url, nil
 }
 
 func DownloadFile(flow *types.Flow, url string) (string, error) {
@@ -313,6 +329,7 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+
 	var folder string = "/tmp/"
 	uniq, err := uuid.NewUUID()
 	if err != nil {
@@ -343,7 +360,7 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 		return "", err
 	}
 
-	err, link  := sendToAssetServer( fullPathToFile, filename )
+	link, err  := sendToAssetServer( fullPathToFile, filename )
 	if err != nil {
 		return "", err
 	}
@@ -355,8 +372,21 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 func StartTTS(say string, gender string, voice string, lang string) (string, error) {
 	// Instantiates a client.
 	ctx := context.Background()
-
-	client, err := texttospeech.NewClient(ctx)
+	settings, err := api.GetSettings()
+	if err != nil {
+		return "", err
+	}
+	var serviceAccountKey = []byte(settings.GoogleServiceAccountJson)
+ 
+	creds, err := google.CredentialsFromJSON(ctx, serviceAccountKey)
+	if err != nil {
+		log.Error(err.Error())
+		return "", err
+	}
+	ctx2 := context.Background()
+	//client, err := texttospeech.NewClient(ctx)
+	opt := option.WithCredentials(creds)
+	client, err := texttospeech.NewClient(ctx2, opt)
 	if err != nil {
 			log.Error(err.Error())
 			return "", err
@@ -415,7 +445,7 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 			return "", err
 	}
 	fmt.Printf("Audio content written to file: %v\n", fullPathToFile)
-	err, link  := sendToAssetServer(  fullPathToFile, filename )
+	link, err  := sendToAssetServer(  fullPathToFile, filename )
 	if err != nil {
 		return "", err
 	}
@@ -425,10 +455,24 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 }
 
 func StartSTT(fileURI string) (string, error) {
-        ctx := context.Background()
+		ctx:= context.Background()
+		settings, err := api.GetSettings()
+		if err != nil {
+			return "", err
+		}
+		var serviceAccountKey = []byte(settings.GoogleServiceAccountJson)
+	
+		creds, err := google.CredentialsFromJSON(ctx, serviceAccountKey)
+		if err != nil {
+			log.Error(err.Error())
+			return "", err
+		}
+		ctx2 := context.Background()
+		//client, err := texttospeech.NewClient(ctx)
+		opt := option.WithCredentials(creds)
 
         // Creates a client.
-        client, err := speech.NewClient(ctx)
+        client, err := speech.NewClient(ctx2, opt)
         if err != nil {
                 fmt.Printf("Failed to create client: %v", err)
 				return "", err
@@ -485,7 +529,7 @@ func SaveLiveRecording(result *record.Result) (string, error) {
 			return "", err
 	}
 	fmt.Printf("Audio content written to file: %v\n", fullPathToFile)
-	err, link  := sendToAssetServer(  fullPathToFile, filename )
+	link, err := sendToAssetServer(  fullPathToFile, filename )
 	if err != nil {
 		return "", err
 	}

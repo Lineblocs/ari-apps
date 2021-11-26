@@ -16,7 +16,7 @@ require (
 	github.com/rotisserie/eris v0.5.1
 	github.com/u2takey/ffmpeg-go v0.3.0
 	golang.org/x/net v0.0.0-20211014172544-2b766c08f1c0
-	google.golang.org/genproto v0.0.0-20211013025323-ce878158c4d4
+	google.golang.org/genproto v0.0.0-20211021150943-2b146023228c
 	google.golang.org/grpc v1.41.0
 	google.golang.org/protobuf v1.27.1
 	rogchap.com/v8go v0.6.0
@@ -54,12 +54,12 @@ require (
 	github.com/zaf/resample v0.0.0-20200305235742-54008d320155 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
-	golang.org/x/oauth2 v0.0.0-20211005180243-6b3c2da341f1 // indirect
-	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
+	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
+	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359 // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
-	google.golang.org/api v0.58.0 // indirect
+	google.golang.org/api v0.60.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
