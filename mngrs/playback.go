@@ -19,42 +19,54 @@ func NewPlaybackManager(mngrCtx *types.Context, flow *types.Flow) (*PlaybackMana
 	return &item
 }
 func (man *PlaybackManager) StartProcessing() {
+	go man.processPlayback()
+}
+
+func (man *PlaybackManager) processPlayback() {
 	log := man.ManagerContext.Log
 	log.Debug( "Creating playback... ")
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
+	channel := man.ManagerContext.Channel
+	model := cell.Model
 	data := cell.Model.Data
+	next, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 	playbackType := data["playback_type"].(types.ModelDataStr).Value
+	loops := utils.PlaybackLoops( model.Data["number_of_loops"] )
 	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 
-	switch ;playbackType { 
-		case "Say":
+	for i:=0; i != loops; i++ {
+		switch ;playbackType { 
+			case "Say":
 
 
-			log.Debug("processing TTS")
-			file, err := utils.StartTTS(data["text_to_say"].(types.ModelDataStr).Value,
-				data["text_gender"].(types.ModelDataStr).Value,
-				data["voice"].(types.ModelDataStr).Value,
-				data["text_language"].(types.ModelDataStr).Value)
-			if err != nil {
-				log.Error("error downloading: " + err.Error())
-			}
+				log.Debug("processing TTS")
+				file, err := utils.StartTTS(data["text_to_say"].(types.ModelDataStr).Value,
+					data["text_gender"].(types.ModelDataStr).Value,
+					data["voice"].(types.ModelDataStr).Value,
+					data["text_language"].(types.ModelDataStr).Value)
+				if err != nil {
+					log.Error("error downloading: " + err.Error())
+				}
 
-			go man.beginPrompt(file)
-		case "Play":
+				man.beginPrompt(file)
+			case "Play":
 
-			log.Debug("processing TTS")
-			file, err := utils.DownloadFile( flow, data["url_audio"].(types.ModelDataStr).Value)
+				log.Debug("processing TTS")
+				file, err := utils.DownloadFile( flow, data["url_audio"].(types.ModelDataStr).Value)
 
-			if err != nil {
-				log.Error("error downloading: " + err.Error())
-			}
-			go man.beginPrompt(file)
+				if err != nil {
+					log.Error("error downloading: " + err.Error())
+				}
+				man.beginPrompt(file)
 
+		}
 	}
-
+	resp := types.ManagerResponse{
+		Channel: channel,
+		Link: next }
+	man.ManagerContext.RecvChannel <- &resp
 }
-
 func (man *PlaybackManager) beginPrompt(prompt string) {
 	log := man.ManagerContext.Log
 	channel := man.ManagerContext.Channel

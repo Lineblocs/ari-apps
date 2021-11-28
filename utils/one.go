@@ -44,6 +44,23 @@ type ConfCache struct {
 func GetPublicIp( ) string {
 	return "0.0.0.0"
 }
+
+func PlaybackLoops( data types.ModelData  ) (int) {
+	item,ok := data.(types.ModelDataStr)
+
+	if !ok {
+		return 1
+	}
+	if item.Value == "" {
+		// default caller id
+		return 1
+	}
+	intVar, err := strconv.Atoi(item.Value)
+	if err != nil {
+		return 1
+	}
+	return intVar
+}
 func DetermineCallerId( call *types.Call, data types.ModelData  ) (string) {
 	item,ok := data.(types.ModelDataStr)
 
