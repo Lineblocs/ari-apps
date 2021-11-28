@@ -80,8 +80,14 @@ func ws(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func healthz(w http.ResponseWriter, r *http.Request) {
+  w.Header().Set("Content-Type", "text/plain")
+  fmt.Fprintf(w, "OK\n")
+}
+
 func startWebsocketServer( ) {
 	http.HandleFunc("/", ws)
+	http.HandleFunc("/healthz", healthz)
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 func StartListener(cl ari.Client) {
