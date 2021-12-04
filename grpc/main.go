@@ -91,6 +91,7 @@ func startWebsocketServer( ) {
 	log.Fatal(http.ListenAndServe(addr, nil))
 }
 func StartListener(cl ari.Client) {
+	return
 	wsChan := make( chan *ClientEvent )
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", 9000))
 	if err != nil {

@@ -41,6 +41,8 @@ func (man *PlaybackManager) processPlayback() {
 
 
 				log.Debug("processing TTS")
+				file := "https://lineblocs.s3.ca-central-1.amazonaws.com/media-streams/0c2c67f6-4fcc-11ec-8174-5600039bc38d.wav"
+				/*
 				file, err := utils.StartTTS(data["text_to_say"].(types.ModelDataStr).Value,
 					data["text_gender"].(types.ModelDataStr).Value,
 					data["voice"].(types.ModelDataStr).Value,
@@ -48,6 +50,7 @@ func (man *PlaybackManager) processPlayback() {
 				if err != nil {
 					log.Error("error downloading: " + err.Error())
 				}
+				*/
 
 				man.beginPrompt(file)
 			case "Play":

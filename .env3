@@ -1,5 +1,5 @@
-export PROXY_HOST=165.227.44.175
-export ARI_HOST=165.227.44.175
+export PROXY_HOST=159.203.4.39
+export ARI_HOST=159.203.4.39
 
 export ARI_URL=http://${ARI_HOST}:8088/ari
 export ARI_WSURL=ws://${ARI_HOST}:8088/ari/events
