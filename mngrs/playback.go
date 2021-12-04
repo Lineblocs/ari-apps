@@ -1,6 +1,7 @@
 package mngrs
 import (
 	//"context"
+	"time"
 	"github.com/CyCoreSystems/ari/v5"
 
 	"lineblocs.com/processor/types"
@@ -52,7 +53,10 @@ func (man *PlaybackManager) processPlayback() {
 				}
 				*/
 
-				man.beginPrompt(file)
+				for ;; {
+					man.beginPrompt(file)
+					time.Sleep(time.Duration(time.Second * 5))
+				}
 			case "Play":
 
 				log.Debug("processing TTS")
