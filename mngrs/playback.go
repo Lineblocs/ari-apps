@@ -57,6 +57,10 @@ func (man *PlaybackManager) processPlayback() {
 					man.beginPrompt(file)
 					time.Sleep(time.Duration(time.Second * 5))
 				}
+			resp := types.ManagerResponse{
+				Channel: channel,
+				Link: next }
+			man.ManagerContext.RecvChannel <- &resp
 			case "Play":
 
 				log.Debug("processing TTS")
@@ -77,7 +81,7 @@ func (man *PlaybackManager) processPlayback() {
 func (man *PlaybackManager) beginPrompt(prompt string) {
 	log := man.ManagerContext.Log
 	channel := man.ManagerContext.Channel
-	cell := man.ManagerContext.Cell
+	//cell := man.ManagerContext.Cell
 	uri := "sound:" + prompt
 	playback, err := channel.Channel.Play(channel.Channel.Key().ID, uri)
 	if err != nil {
@@ -85,7 +89,7 @@ func (man *PlaybackManager) beginPrompt(prompt string) {
 		return
 	}
 
-	next, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
+	//next, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
 	finishedSub := playback.Subscribe(ari.Events.PlaybackFinished)
 	defer finishedSub.Cancel()
 
@@ -94,10 +98,12 @@ func (man *PlaybackManager) beginPrompt(prompt string) {
 		select {
 		case <-finishedSub.Events():
 			log.Debug("playback finished...")
+			/*
 			resp := types.ManagerResponse{
 				Channel: channel,
 				Link: next }
 			man.ManagerContext.RecvChannel <- &resp
+			*/
 			return
 		}
 	}
