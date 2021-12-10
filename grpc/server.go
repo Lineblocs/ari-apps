@@ -364,7 +364,8 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 
 	callType :=  req.CallType
 
-	sipHeaders := utils.CreateSIPHeaders(domain, callerId, callType)
+	apiCallId := ""
+	sipHeaders := utils.CreateSIPHeaders(domain, callerId, callType, apiCallId)
 	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, sipHeaders) )
 
 	if err != nil {

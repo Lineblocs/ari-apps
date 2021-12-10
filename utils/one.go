@@ -273,12 +273,13 @@ func GetSIPSecretKey() string {
 }
 
 
-func CreateSIPHeaders(domain string, callerId string, typeOfCall string) map[string]string {
+func CreateSIPHeaders(domain, callerId, typeOfCall, apiCallId string) map[string]string {
 	headers := make( map[string]string )
 	headers["SIPADDHEADER0"] = "X-LineBlocs-Key: " + GetSIPSecretKey()
 	headers["SIPADDHEADER1"] = "X-LineBlocs-Domain: " + domain
 	headers["SIPADDHEADER2"] = "X-LineBlocs-Route-Type: " + typeOfCall
 	headers["SIPADDHEADER3"] ="X-LineBlocs-Caller: " + callerId
+	headers["SIPADDHEADER4"] ="X-LineBlocs-API-CallId: " + apiCallId
 	return headers
 }
 

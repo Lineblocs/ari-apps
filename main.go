@@ -226,7 +226,8 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 
 
 	domain := user.Workspace.Domain
-	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall)
+	apiCallId := ""
+	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall, apiCallId)
 	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )

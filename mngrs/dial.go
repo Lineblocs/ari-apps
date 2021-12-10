@@ -156,7 +156,8 @@ func (man *DialManager) startOutboundCall(callType string) {
 	case "Phone Number":
 		mappedCallType = "pstn"
 		}
-	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType)
+	apiCallId := strconv.Itoa( flow.RootCall.CallId )
+	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType, apiCallId)
 	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 
 	if err != nil {
