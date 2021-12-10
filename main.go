@@ -224,25 +224,6 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 
 	log.Debug("Originating call...")
 
-
-	domain := user.Workspace.Domain
-	apiCallId := ""
-	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall, apiCallId)
-	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
-	if err != nil {
-		log.Error( "error occured: " + err.Error() )
-		return err
-	}
-
-
-	stopChannel := make( chan bool )
-	outChannel.Channel = outboundChannel
-
-
-
-
-
-
 	params := types.CallParams{
 		From: callerId,
 		To: numberToCall,
@@ -276,7 +257,17 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 		Started: time.Now(),
 		Params: &params }
 
+	domain := user.Workspace.Domain
+	apiCallId := strconv.Itoa( call.CallId )
+	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall, apiCallId)
+	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return err
+	}
 
+	stopChannel := make( chan bool )
+	outChannel.Channel = outboundChannel
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go manageBridge(lineBridge, &call, lineChannel, &outChannel, wg)

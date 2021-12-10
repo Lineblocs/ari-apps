@@ -361,19 +361,6 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 		fmt.Println("error creating outbound channel: " + err.Error())
 		return nil, err
 	}
-
-	callType :=  req.CallType
-
-	apiCallId := ""
-	sipHeaders := utils.CreateSIPHeaders(domain, callerId, callType, apiCallId)
-	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, sipHeaders) )
-
-	if err != nil {
-		fmt.Println( "error occured: " + err.Error() )
-		return nil, err
-	}
-	outChannel.Channel = outboundChannel
-
 	user, err := strconv.Atoi( userId )
 	if err != nil {
 		fmt.Println( "error occured: " + err.Error() )
@@ -407,6 +394,16 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 		fmt.Println( "error occured: " + err.Error() )
 		return nil, err
 	}
+	callType :=  req.CallType
+	apiCallId := strconv.Itoa( call.CallId )
+	sipHeaders := utils.CreateSIPHeaders(domain, callerId, callType, apiCallId)
+	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, sipHeaders) )
+
+	if err != nil {
+		fmt.Println( "error occured: " + err.Error() )
+		return nil, err
+	}
+	outChannel.Channel = outboundChannel
 	stopChannel := make( chan bool, 1 )
 	go s.manageCall( call, &outChannel, clientId, stopChannel )
 	go s.startListeningForRingTimeout(timeout, &outChannel, stopChannel)

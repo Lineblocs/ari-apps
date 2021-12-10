@@ -156,17 +156,6 @@ func (man *DialManager) startOutboundCall(callType string) {
 	case "Phone Number":
 		mappedCallType = "pstn"
 		}
-	apiCallId := strconv.Itoa( flow.RootCall.CallId )
-	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType, apiCallId)
-	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
-
-	if err != nil {
-		log.Error( "error occured: " + err.Error() )
-		return
-	}
-	outChannel.Channel = outboundChannel
-
-
 
 
 	params := types.CallParams{
@@ -185,7 +174,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	log.Info("creating outbound call...")
 	resp, err := api.SendHttpRequest( "/call/createCall", body )
-	_, err = utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
+	outCall, err := utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
 
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )
@@ -194,8 +183,15 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 
 
+	apiCallId := strconv.Itoa( outCall.CallId )
+	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType, apiCallId)
+	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 
-
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return
+	}
+	outChannel.Channel = outboundChannel
 	stopChannel := make( chan bool )
 	wg1 := new(sync.WaitGroup)
 	wg1.Add(1)
