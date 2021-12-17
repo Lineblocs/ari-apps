@@ -17,13 +17,13 @@ type DialManager struct {
 	Flow *types.Flow
 }
 
-func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) {
+func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, outCall *types.Call, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) {
 	ctx := man.ManagerContext
 	lineChannel := ctx.Channel
 	cell := ctx.Cell
 	log := ctx.Log
 	flow:=ctx.Flow
-	record := helpers.NewRecording(flow.User,nil)
+	record := helpers.NewRecording(flow.User,&outCall.CallId)
 	_,recordErr:=record.InitiateRecordingForChannel(outboundChannel)
 
 	if recordErr != nil {
@@ -195,7 +195,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 	stopChannel := make( chan bool )
 	wg1 := new(sync.WaitGroup)
 	wg1.Add(1)
- 	go man.manageOutboundCallLeg(&outChannel, wg1, stopChannel)
+ 	go man.manageOutboundCallLeg(&outChannel, outCall, wg1, stopChannel)
 
 	wg1.Wait()
 
