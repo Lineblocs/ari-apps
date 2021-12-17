@@ -53,28 +53,19 @@ func (man *PlaybackManager) processPlayback() {
 				}
 				*/
 
-				for i:=0;i!=loops;i++ {
-					man.beginPrompt(file)
-					time.Sleep(time.Duration(time.Millisecond * 100))
-				}
-				resp := types.ManagerResponse{
-					Channel: channel,
-					Link: next }
-				man.ManagerContext.RecvChannel <- &resp
+				man.beginPrompt(file)
+				time.Sleep(time.Duration(time.Millisecond * 100))
 			case "Play":
 
-				log.Debug("processing TTS")
+				log.Debug("processing file download")
 				file, err := utils.DownloadFile( flow, data["url_audio"].(types.ModelDataStr).Value)
 
 				if err != nil {
 					log.Error("error downloading: " + err.Error())
 				}
 
-				for i:=0;i!=loops;i++ {
-					man.beginPrompt(file)
-					time.Sleep(time.Duration(time.Millisecond * 100))
-				}
-
+				man.beginPrompt(file)
+				time.Sleep(time.Duration(time.Millisecond * 100))
 		}
 	}
 	resp := types.ManagerResponse{
