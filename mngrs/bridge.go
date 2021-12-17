@@ -281,6 +281,11 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 
 	log.Info("creating outbound call...")
 	resp, err := api.SendHttpRequest( "/call/createCall", body )
+
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return
+	}
 	outCall, err := utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
 
 	if err != nil {

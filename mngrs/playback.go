@@ -53,14 +53,14 @@ func (man *PlaybackManager) processPlayback() {
 				}
 				*/
 
-				for ;; {
+				for i:=0;i!=loops;i++ {
 					man.beginPrompt(file)
-					time.Sleep(time.Duration(time.Second * 5))
+					time.Sleep(time.Duration(time.Millisecond * 100))
 				}
-			resp := types.ManagerResponse{
-				Channel: channel,
-				Link: next }
-			man.ManagerContext.RecvChannel <- &resp
+				resp := types.ManagerResponse{
+					Channel: channel,
+					Link: next }
+				man.ManagerContext.RecvChannel <- &resp
 			case "Play":
 
 				log.Debug("processing TTS")
@@ -69,7 +69,11 @@ func (man *PlaybackManager) processPlayback() {
 				if err != nil {
 					log.Error("error downloading: " + err.Error())
 				}
-				man.beginPrompt(file)
+
+				for i:=0;i!=loops;i++ {
+					man.beginPrompt(file)
+					time.Sleep(time.Duration(time.Millisecond * 100))
+				}
 
 		}
 	}
