@@ -85,7 +85,8 @@ func startProcessingFlow( cl ari.Client, ctx context.Context, flow *types.Flow, 
 					return
 				}
 				next := resp.Link
-				startProcessingFlow( cl, ctx, flow, resp.Channel, eventVars, next.Target, runner)
+				defer startProcessingFlow( cl, ctx, flow, resp.Channel, eventVars, next.Target, runner)
+				return
 		}
 	}
 }
