@@ -23,7 +23,7 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 	cell := ctx.Cell
 	log := ctx.Log
 	flow:=ctx.Flow
-	record := helpers.NewRecording(flow.User,&outCall.CallId)
+	record := helpers.NewRecording(flow.User,&outCall.CallId, false)
 	_,recordErr:=record.InitiateRecordingForChannel(outboundChannel)
 
 	if recordErr != nil {

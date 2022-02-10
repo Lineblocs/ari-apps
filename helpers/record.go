@@ -17,6 +17,7 @@ type Record struct {
 	User *types.User
 	CallId *int
 	Handle *ari.LiveRecordingHandle
+	
 }
 
 type RecordingParams struct {
@@ -27,12 +28,13 @@ type RecordingParams struct {
 	WorkspaceId int `json:"workspace_id"`
 	StorageId string `json:"storage_id"`
 	StorageServerIp string `json:"storage_server_ip"`
+	Trim bool `json:"trim"`
 }
 
 
-func NewRecording(user *types.User, callId *int) (*Record) {
+func NewRecording(user *types.User, callId *int, trim bool) (*Record) {
 	record := Record{
-		User: user, CallId:callId }
+		User: user, CallId:callId, Trim: trim }
 
 	return &record
 }
@@ -46,7 +48,6 @@ func (r *Record) createAPIResource() (string, error) {
 	}
 
 
-
 	id := uniq.String()
 	params := RecordingParams{
 		UserId: user.Id,
@@ -54,6 +55,7 @@ func (r *Record) createAPIResource() (string, error) {
 		Tag: "",
 		Status: "started",
 		WorkspaceId: user.Workspace.Id,
+		Trim: r.Trim,
 		StorageId: id,
 		StorageServerIp: utils.GetARIHost()}
 
