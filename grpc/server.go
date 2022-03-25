@@ -997,7 +997,7 @@ func (s *Server) RecordingStop(ctx context.Context, req *RecordingRequest) (*Rec
 	}
 
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording( user,nil )
+	recording := helpers.NewRecording( user,nil,false )
 	go recording.Stop()
 	s.dispatchEvent(func() {
 		// send to channel

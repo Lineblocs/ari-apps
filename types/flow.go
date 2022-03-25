@@ -90,6 +90,13 @@ type FlowDIDData struct {
 	FlowJson string `json:"flow_json"`
 	Plan string `json:"plan"`
 }
+type SIPTrunkData struct {
+	//FlowJson FlowVars `json:"flow_json"`
+	Domain string `json:"domain"`
+	WorkspaceId int `json:"workspace_id"`
+	WorkspaceName string `json:"workspace_name"`
+	CreatorId int `json:"creator_id"`
+}
 func findCellInFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 
 	var cellToFind *GraphCell

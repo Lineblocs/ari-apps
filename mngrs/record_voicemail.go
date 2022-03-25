@@ -4,6 +4,8 @@ import (
 	//"github.com/CyCoreSystems/ari/v5"
 
 	"lineblocs.com/processor/types"
+	"lineblocs.com/processor/helpers"
+	"fmt"
 )
 type RecordVoicemailManager struct {
 	ManagerContext *types.Context
@@ -25,12 +27,16 @@ func (man *RecordVoicemailManager) StartProcessing() {
 	channel := cell.CellChannel
 	user := flow.User
 	data := cell.Model.Data
-	trim := data["trim"].(types.ModelDataBool)
+	trimData,ok := data["trim"].(types.ModelDataBool)
+	trim:=false
+
+	if ok {
+		trim =trimData.Value
+	}
 	recording := helpers.NewRecording( user, nil, trim )
 	_, err :=recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("recording err " + err.Error())
-		return nil, err
+		return
 	}
-
 }

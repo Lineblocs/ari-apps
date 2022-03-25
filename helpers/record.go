@@ -17,7 +17,7 @@ type Record struct {
 	User *types.User
 	CallId *int
 	Handle *ari.LiveRecordingHandle
-	
+	Trim bool	
 }
 
 type RecordingParams struct {
