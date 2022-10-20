@@ -312,12 +312,20 @@ func processSIPTrunkCall(
 		src *ari.Key, 
 		user *types.User, lineChannel *types.LineChannel, 
 		callerId string, 
-		numberToCall string,
-		sipAddr string) (error) {
+		exten string) (error) {
  	log := utils.GetLogger()
 	log.Debug("ensureBridge called..")
 	var bridge *ari.BridgeHandle 
 	var err error
+	queryParams := make(map[string]string)
+	queryParams["did"] = exten
+	sipAddr, err := api.SendGetRequest("/user/lookupSIPTrunkByDID", queryParams)
+
+	if err != nil {
+		log.Error( "error occured: " + err.Error() )
+		return err
+	}
+
 
 	key := src.New(ari.BridgeKey, rid.New(rid.Bridge))
 	bridge, err = cl.Bridge().Create(key, "mixing", key.ID)
@@ -329,7 +337,7 @@ func processSIPTrunkCall(
 	lineBridge := types.NewBridge(bridge)
 	
 	log.Info("channel added to bridge")
-	outboundChannel, err := cl.Channel().Create(nil, utils.CreateChannelRequest( numberToCall )	)
+	outboundChannel, err := cl.Channel().Create(nil, utils.CreateChannelRequest( exten )	)
 
 	if err != nil {
 		log.Debug("error creating outbound channel: " + err.Error())
@@ -341,7 +349,7 @@ func processSIPTrunkCall(
 
 	params := types.CallParams{
 		From: callerId,
-		To: numberToCall,
+		To: exten,
 		Status: "start",
 		Direction: "inbound",
 		UserId:  user.Id,
@@ -355,7 +363,7 @@ func processSIPTrunkCall(
 
 
 	log.Info("creating call...")
-	log.Info("calling " + numberToCall)
+	log.Info("calling " + exten)
 	resp, err := api.SendHttpRequest( "/call/createCall", body)
 
 	if err != nil {
@@ -375,7 +383,7 @@ func processSIPTrunkCall(
 	domain := user.Workspace.Domain
 	apiCallId := strconv.Itoa( call.CallId )
 	headers := utils.CreateSIPHeadersForSIPTrunkCall(domain, callerId, "pstn", apiCallId, sipAddr)
-	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
+	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, exten, headers) )
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )
 		return err
@@ -616,29 +624,13 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 
 		fmt.Println("Already dialed - not processing")
 	case "INCOMING_SIP_TRUNK":
-		body, err := api.SendGetRequest("/user/lookupSIPTrunkByDID", vals)
-
-		if err != nil {
-			log.Error("startExecution err " + err.Error())
-			return
-		}
-
-		var data types.SIPTrunkData
-		err = json.Unmarshal( []byte(body), &data )
-		if err != nil {
-			log.Error("startExecution err " + err.Error())
-			return
-		}
-
 		//domain := data.Domain
 		callerId := event.Args[ 2 ]
-		sipAddr := event.Args[ 3 ]
-		numberToCall:= exten
 		h.Answer()
 		user := types.NewUser(data.CreatorId, data.WorkspaceId, data.WorkspaceName)
 		lineChannel := types.LineChannel{
 			Channel: h }
-		err = processSIPTrunkCall( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, numberToCall, sipAddr)
+		err = processSIPTrunkCall( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten)
 		if err != nil {
 			log.Debug("could not create bridge. error: " + err.Error())
 			return
@@ -771,12 +763,12 @@ if err != nil {
 		log.Info("media service call..")
 	case "OUTGOING_TRUNK_CALL":
 		callerId := event.Args[ 2 ]
-		domain := event.Args[ 3 ]
+		trunkSourceIp := event.Args[ 3 ]
 		log.Debug("channel key: " + h.Key().ID)
 
 		lineChannel := types.LineChannel{
 			Channel: h }
-		resp, err := api.GetUserByDomain( domain )
+		resp, err := api.GetUserByTrunkSourceIp( domain )
 
 		if err != nil {
 			log.Debug("could not get domain. error: " + err.Error())

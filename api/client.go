@@ -201,7 +201,21 @@ func VerifyCallerId( workspaceId string, callerId string) (bool, error) {
 	return data.Valid, nil
 }
 
-
+func GetUserByTrunkSourceIp ( trunkSourceIp string ) (*DomainResponse, error) {
+	params := make( map[string]string )
+	fmt.Println("looking up trunk source ip: " + trunkSourceIp)
+	params["source_ip"] = trunkSourceIp
+	res, err := SendGetRequest("/user/getUserByTrunkSourceIp", params)
+	if err != nil {
+		return nil, err
+	}
+	var data DomainResponse
+ 	err = json.Unmarshal( []byte(res), &data  )
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
 func GetUserByDomain( domain string ) (*DomainResponse, error) {
 	params := make( map[string]string )
 	fmt.Println("looking up domain: " + domain)
