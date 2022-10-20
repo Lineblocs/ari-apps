@@ -310,7 +310,8 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 func processSIPTrunkCall( 
 		cl ari.Client,
 		src *ari.Key, 
-		user *types.User, lineChannel *types.LineChannel, 
+		user *types.User, 
+		lineChannel *types.LineChannel, 
 		callerId string, 
 		exten string) (error) {
  	log := utils.GetLogger()
@@ -625,9 +626,18 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		fmt.Println("Already dialed - not processing")
 	case "INCOMING_SIP_TRUNK":
 		//domain := data.Domain
+		exten := event.Args[ 1 ]
 		callerId := event.Args[ 2 ]
 		h.Answer()
-		user := types.NewUser(data.CreatorId, data.WorkspaceId, data.WorkspaceName)
+
+		resp, err := api.GetUserByDID( exten )
+
+		if err != nil {
+			log.Debug("could not get domain. error: " + err.Error())
+			return
+		}
+		log.Debug("workspace ID= " + strconv.Itoa(resp.WorkspaceId))
+		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 		lineChannel := types.LineChannel{
 			Channel: h }
 		err = processSIPTrunkCall( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten)
@@ -768,7 +778,7 @@ if err != nil {
 
 		lineChannel := types.LineChannel{
 			Channel: h }
-		resp, err := api.GetUserByTrunkSourceIp( domain )
+		resp, err := api.GetUserByTrunkSourceIp( trunkSourceIp )
 
 		if err != nil {
 			log.Debug("could not get domain. error: " + err.Error())
@@ -777,7 +787,7 @@ if err != nil {
 		log.Debug("workspace ID= " + strconv.Itoa(resp.WorkspaceId))
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
-		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
+		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, resp.WorkspaceName)
 
 		callerInfo, err := api.GetCallerId(user.Workspace.Domain, callerId)
 

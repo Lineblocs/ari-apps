@@ -216,6 +216,22 @@ func GetUserByTrunkSourceIp ( trunkSourceIp string ) (*DomainResponse, error) {
 	}
 	return &data, nil
 }
+
+func GetUserByDID ( did string ) (*DomainResponse, error) {
+	params := make( map[string]string )
+	fmt.Println("looking up user for did: " + did)
+	params["did"] = did
+	res, err := SendGetRequest("/user/getUserByDID", params)
+	if err != nil {
+		return nil, err
+	}
+	var data DomainResponse
+ 	err = json.Unmarshal( []byte(res), &data  )
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
 func GetUserByDomain( domain string ) (*DomainResponse, error) {
 	params := make( map[string]string )
 	fmt.Println("looking up domain: " + domain)
