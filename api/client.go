@@ -78,8 +78,11 @@ type SettingsResponse struct {
 	SmtpTls string `json:"smtp_tls"`
 	GoogleServiceAccountJson string `json:"google_service_account_json"`
 }
+
+
+var baseUrl string = "https://internals.lineblocs.com"
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
-    url := "https://internals.lineblocs.com" + path
+    url := baseUrl + path
     fmt.Println("URL:>", url)
 
     req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
@@ -152,7 +155,7 @@ status := resp.StatusCode
 }
 
 func SendGetRequest(path string, vals map[string] string) (string, error) {
-    fullUrl := "https://internals.lineblocs.com" + path + "?"
+    fullUrl := baseUrl + path + "?"
 
 	for k,v := range vals {
 		fullUrl = fullUrl + (k + "=" + url.QueryEscape(v)) + "&"
