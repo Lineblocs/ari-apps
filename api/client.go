@@ -80,7 +80,7 @@ type SettingsResponse struct {
 }
 
 
-var baseUrl string = "https://internals.lineblocs.com"
+var baseUrl string = "http://internals.lineblocs.com"
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     url := baseUrl + path
     fmt.Println("URL:>", url)
