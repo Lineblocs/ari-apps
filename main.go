@@ -788,16 +788,9 @@ if err != nil {
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, resp.WorkspaceName)
-
-		callerInfo, err := api.GetCallerId(user.Workspace.Domain, callerId)
-
-		if err != nil {
-			log.Debug("could not get caller id. error: " + err.Error())
-			return
-		}
-		fmt.Printf("setup caller id: " + callerInfo.CallerId)
+		fmt.Printf("setup caller id: " + callerId)
 		h.Answer()
-		err=ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn")
+		err=ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn")
 		if err != nil {
 			log.Debug("could not create bridge. error: " + err.Error())
 			return

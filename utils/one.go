@@ -269,7 +269,8 @@ func SafeHangup(lineChannel *types.LineChannel) {
 func GetSIPSecretKey() string {
 	//return "BrVIsXzQx9-7lvRsXMC2V57dA4UEc-G_HwnCpK-zctk"
 	//return "BrVIsXzQx9-7lvRsXMC2V57dA4UEc-G_HwnCpK-zctk"
-	return "xxx"
+	key := os.Getenv("LINEBLOCS_KEY")
+	return key
 }
 
 
