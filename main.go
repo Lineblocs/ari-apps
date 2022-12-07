@@ -198,7 +198,7 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 }
 
 
-func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string) (error) {
+func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string, addedHeaders *[]string) (error) {
  	log := utils.GetLogger()
 	log.Debug("ensureBridge called..")
 	var bridge *ari.BridgeHandle 
@@ -259,7 +259,7 @@ func ensureBridge( cl ari.Client,	src *ari.Key, user *types.User, lineChannel *t
 
 	domain := user.Workspace.Domain
 	apiCallId := strconv.Itoa( call.CallId )
-	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall, apiCallId)
+	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall, apiCallId, addedHeaders)
 	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )
@@ -728,7 +728,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
 		fmt.Printf("Calling %s\r\n", exten)
 		h.Answer()
-		err = ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension")
+		err = ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension", nil)
 		if err != nil {
 			log.Debug("could not create bridge. error: " + err.Error())
 			return
@@ -762,7 +762,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		}
 		fmt.Printf("setup caller id: " + callerInfo.CallerId)
 		h.Answer()
-			err=ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn")
+			err=ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn", nil)
 if err != nil {
 			log.Debug("could not create bridge. error: " + err.Error())
 			return
@@ -790,7 +790,9 @@ if err != nil {
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, resp.WorkspaceName)
 		fmt.Printf("setup caller id: " + callerId)
 		h.Answer()
-		err=ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn")
+		headers:= make([]string, 0)
+		headers=append( headers, "X-Lineblocs-User-SIP-Trunk-Calling-PSTN: true" )
+		err=ensureBridge( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn", &headers)
 		if err != nil {
 			log.Debug("could not create bridge. error: " + err.Error())
 			return

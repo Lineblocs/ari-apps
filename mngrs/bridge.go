@@ -295,7 +295,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge,callType st
 
 
 	apiCallId := strconv.Itoa( outCall.CallId )
-	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType, apiCallId)
+	headers := utils.CreateSIPHeaders(domain, callerId, mappedCallType, apiCallId, nil)
 	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, headers) )
 
 	if err != nil {
