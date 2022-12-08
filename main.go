@@ -313,21 +313,12 @@ func processSIPTrunkCall(
 		user *types.User, 
 		lineChannel *types.LineChannel, 
 		callerId string, 
-		exten string) (error) {
+		exten string,
+		trunkAddr string) (error) {
  	log := utils.GetLogger()
 	log.Debug("ensureBridge called..")
 	var bridge *ari.BridgeHandle 
 	var err error
-	queryParams := make(map[string]string)
-	queryParams["did"] = exten
-	sipAddr, err := api.SendGetRequest("/user/lookupSIPTrunkByDID", queryParams)
-
-	if err != nil {
-		log.Error( "error occured: " + err.Error() )
-		return err
-	}
-
-
 	key := src.New(ari.BridgeKey, rid.New(rid.Bridge))
 	bridge, err = cl.Bridge().Create(key, "mixing", key.ID)
 	if err != nil {
@@ -383,7 +374,7 @@ func processSIPTrunkCall(
 
 	domain := user.Workspace.Domain
 	apiCallId := strconv.Itoa( call.CallId )
-	headers := utils.CreateSIPHeadersForSIPTrunkCall(domain, callerId, "pstn", apiCallId, sipAddr)
+	headers := utils.CreateSIPHeadersForSIPTrunkCall(domain, callerId, "pstn", apiCallId, trunkAddr)
 	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, exten, headers) )
 	if err != nil {
 		log.Error( "error occured: " + err.Error() )
@@ -628,10 +619,13 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		//domain := data.Domain
 		exten := event.Args[ 1 ]
 		callerId := event.Args[ 2 ]
+		trunkAddr := event.Args[ 3 ]
 		h.Answer()
 
 		resp, err := api.GetUserByDID( exten )
-
+		log.Debug("exten =" + exten)
+		log.Debug("caller ID =" + callerId)
+		log.Debug("trunk addr =" + trunkAddr)
 		if err != nil {
 			log.Debug("could not get domain. error: " + err.Error())
 			return
@@ -640,7 +634,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 		lineChannel := types.LineChannel{
 			Channel: h }
-		err = processSIPTrunkCall( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten)
+		err = processSIPTrunkCall( cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, trunkAddr)
 		if err != nil {
 			log.Debug("could not create bridge. error: " + err.Error())
 			return
