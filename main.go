@@ -174,7 +174,10 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 	startSub := outboundChannel.Channel.Subscribe(ari.Events.StasisStart)
 
 	defer startSub.Cancel()
+	destroyedSub := outboundChannel.Channel.Subscribe(ari.Events.ChannelDestroyed)
+	defer destroyedSub.Cancel()
 	wg.Done()
+	log.Debug("managing outbound call...")
 	log.Debug("listening for channel events...")
 
 	for {
@@ -192,6 +195,14 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
  				ringTimeoutChan <- true
 			case <-endSub.Events():
 				log.Debug("ended call..")
+				lineChannel.Channel.StopRing()
+				lineChannel.Channel.Hangup()
+				//endBridgeCall(lineBridge)
+			case <-destroyedSub.Events():
+				log.Debug("channel destroyed..")
+				lineChannel.Channel.StopRing()
+				lineChannel.Channel.Hangup()
+				//endBridgeCall(lineBridge)
 
 		}
 	}
