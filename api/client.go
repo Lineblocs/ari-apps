@@ -81,7 +81,7 @@ type SettingsResponse struct {
 }
 
 
-var baseUrl string = os.Getenv("INTERNALS_API_ENDPOINT")
+var baseUrl string = "https://internals." + os.Getenv("DEPLOYMENT_DOMAIN")
 
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     url := baseUrl + path
