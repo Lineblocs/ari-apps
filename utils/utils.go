@@ -355,7 +355,7 @@ func sendToAssetServer( path string, filename string ) (string, error) {
 
 
 	// send back link to media
-	url := "https://mediafs." + os.Getenv("DEPLOYMENT_DOMAIN") + key
+	url := "https://mediafs." + os.Getenv("DEPLOYMENT_DOMAIN") + "/" + key
 	return url, nil
 }
 
