@@ -3,6 +3,7 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
+	"os"
 	"fmt"
 	"time"
 	"net/http"
@@ -80,7 +81,8 @@ type SettingsResponse struct {
 }
 
 
-var baseUrl string = "http://internals.lineblocs.com"
+var baseUrl string = os.Getenv("INTERNALS_API_ENDPOINT")
+
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
     url := baseUrl + path
     fmt.Println("URL:>", url)
@@ -127,7 +129,7 @@ status := resp.StatusCode
 
 
 func SendPutRequest(path string, payload []byte) (string, error) {
-    url := "https://internals.lineblocs.com" + path
+    url := baseUrl + path
     fmt.Println("URL:>", url)
 
     req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(payload))
