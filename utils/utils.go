@@ -355,7 +355,7 @@ func sendToAssetServer( path string, filename string ) (string, error) {
 
 
 	// send back link to media
-	url := "https://lineblocs.s3.ca-central-1.amazonaws.com/" + key
+	url := "https://mediafs." + os.Getenv("DEPLOYMENT_DOMAIN") + key
 	return url, nil
 }
 
