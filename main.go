@@ -47,7 +47,10 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
 	var cl ari.Client
 	var useProxy bool
  	log := utils.GetLogger()
- 	log.Info("Connecting to: " + os.Getenv("ARI_URL"))
+	host := os.Getenv("ARI_HOST")
+	ariUrl := fmt.Sprintf("http://%s:8088/ari", host)
+	wsUrl := fmt.Sprintf("ws://%s:8088/ari/events", host)
+ 	log.Info("Connecting to: " + ariUrl)
 	proxy := os.Getenv("ARI_USE_PROXY")
 	if proxy != "" {
 		useProxy,err = strconv.ParseBool( proxy )
@@ -69,8 +72,8 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
 			Application:  ariApp,
 			Username:     os.Getenv("ARI_USERNAME"),
 			Password:     os.Getenv("ARI_PASSWORD"),
-			URL:          os.Getenv("ARI_URL"),
-			WebsocketURL: os.Getenv("ARI_WSURL") })
+			URL:          ariUrl,
+			WebsocketURL: wsUrl })
 	return cl,err
  }
 
