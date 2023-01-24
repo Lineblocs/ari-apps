@@ -1,29 +1,31 @@
 package mngrs
+
 import (
 	//"context"
 	"strings"
 	//"github.com/CyCoreSystems/ari/v5"
 
+	"github.com/sirupsen/logrus"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
+
 type SwitchManager struct {
 	ManagerContext *types.Context
-	Flow *types.Flow
+	Flow           *types.Flow
 }
 
-func NewSwitchManager(mngrCtx *types.Context, flow *types.Flow) (*SwitchManager) {
+func NewSwitchManager(mngrCtx *types.Context, flow *types.Flow) *SwitchManager {
 	//rootCtx, _ := context.WithCancel(context.Background())
 	item := SwitchManager{
-		ManagerContext:mngrCtx,
-		Flow: flow}
+		ManagerContext: mngrCtx,
+		Flow:           flow}
 	return &item
 }
 func (man *SwitchManager) StartProcessing() {
-	go man.startTestForCondition( );
+	go man.startTestForCondition()
 }
 func (man *SwitchManager) startTestForCondition() {
-	log := man.ManagerContext.Log
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	channel := man.ManagerContext.Channel
@@ -34,25 +36,25 @@ func (man *SwitchManager) startTestForCondition() {
 	before := data["test_before_interpolations"].(types.ModelDataStr).Value
 	test := data["test"].(types.ModelDataStr).Value
 	var result string
-	_, _ = utils.FindLinkByName( cell.SourceLinks, "source", "Finished")
+	_, _ = utils.FindLinkByName(cell.SourceLinks, "source", "Finished")
 
 	if strings.HasPrefix(test, "{{") && strings.HasSuffix(test, "}}") {
 		result = before
 	} else {
-		log.Debug("test variable: " + test)
+		utils.Log(logrus.DebugLevel, "test variable: "+test)
 		splitted := strings.Split(test, ".")
-		if  len( splitted ) > 1 {
-			name := splitted[ 0 ]
-			variable := strings.Join(splitted[ 1:len( splitted ) ], ".")
-			log.Debug("looking UP: " + variable)
-			value, err := utils.LookupCellVariable( flow, name, variable )
+		if len(splitted) > 1 {
+			name := splitted[0]
+			variable := strings.Join(splitted[1:len(splitted)], ".")
+			utils.Log(logrus.DebugLevel, "looking UP: "+variable)
+			value, err := utils.LookupCellVariable(flow, name, variable)
 			if err != nil {
-				log.Debug("cell lookup error: " + err.Error())
+				utils.Log(logrus.DebugLevel, "cell lookup error: "+err.Error())
 			}
 			result = value
 		}
 	}
-	log.Debug("result is: " + result)
+	utils.Log(logrus.DebugLevel, "result is: "+result)
 
 	var matched *types.ModelLink
 	for _, link := range links {
@@ -60,9 +62,9 @@ func (man *SwitchManager) startTestForCondition() {
 		condType := link.Type
 		value := link.Value
 
-		log.Debug("Cond type: " + condType);
-		log.Debug("Cond: " + cond);
-		log.Debug("Value: " + value);
+		utils.Log(logrus.DebugLevel, "Cond type: "+condType)
+		utils.Log(logrus.DebugLevel, "Cond: "+cond)
+		utils.Log(logrus.DebugLevel, "Value: "+value)
 		if condType == "LINK_CONDITION_MATCHES" {
 			if cond == "Equals" && result == value {
 				// matched
@@ -83,22 +85,21 @@ func (man *SwitchManager) startTestForCondition() {
 	if matched != nil {
 
 		for _, item := range sourceLinks {
-			log.Debug("comparing 1: " + matched.Cell);
-			log.Debug("comparing 2: " + item.Target.Model.Name);
+			utils.Log(logrus.DebugLevel, "comparing 1: "+matched.Cell)
+			utils.Log(logrus.DebugLevel, "comparing 2: "+item.Target.Model.Name)
 			if item.Target.Model.Name == matched.Cell {
-				log.Debug("found match - going to result..");
+				utils.Log(logrus.DebugLevel, "found match - going to result..")
 				resp := types.ManagerResponse{
 					Channel: channel,
-					Link: item }
+					Link:    item}
 				man.ManagerContext.RecvChannel <- &resp
-				return;
+				return
 			}
 		}
 	}
-				resp := types.ManagerResponse{
-					Channel: channel,
-					Link: nil }
-				man.ManagerContext.RecvChannel <- &resp
-
+	resp := types.ManagerResponse{
+		Channel: channel,
+		Link:    nil}
+	man.ManagerContext.RecvChannel <- &resp
 
 }

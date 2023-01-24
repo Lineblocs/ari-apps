@@ -1,22 +1,24 @@
 package mngrs
+
 import (
 	//"github.com/CyCoreSystems/ari/v5"
 	//clientcmd "k8s.io/client-go/1.5/tools/clientcmd"
-    //"k8s.io/client-go/kubernetes"
+	//"k8s.io/client-go/kubernetes"
 	"context"
-	"strconv"
-	"fmt"
 	"errors"
-	"lineblocs.com/processor/utils"
+	"fmt"
+	"strconv"
+
+	"github.com/sirupsen/logrus"
 	"lineblocs.com/processor/types"
+	"lineblocs.com/processor/utils"
 
 	"google.golang.org/grpc"
 	"lineblocs.com/processor/router"
 )
 
-func (man *MacroManager) startGRPCAndRunMacro(macro *types.WorkspaceMacro, params map[string]string) (error) {
+func (man *MacroManager) startGRPCAndRunMacro(macro *types.WorkspaceMacro, params map[string]string) error {
 	ctx := man.ManagerContext
-	log := ctx.Log
 	user := ctx.Flow.User
 	channel := ctx.Channel
 	flow := ctx.Flow
@@ -30,75 +32,72 @@ func (man *MacroManager) startGRPCAndRunMacro(macro *types.WorkspaceMacro, param
 	svcUri := fmt.Sprintf("%s.%s.svc.cluster.local:%s", user.WorkspaceName, name, port)
 	conn, err := grpc.Dial(svcUri, grpc.WithInsecure())
 	if err != nil {
-		log.Error("did not connect: " + err.Error())
+		utils.Log(logrus.ErrorLevel, "did not connect: "+err.Error())
 		return err
 	}
 	defer conn.Close()
 
 	c := router.NewLineblocsWorspaceSvcClient(conn)
 	params["channel_id"] = channel.Channel.ID()
-	params["flow_id"] = strconv.Itoa( flow.FlowId )
+	params["flow_id"] = strconv.Itoa(flow.FlowId)
 	params["cell_id"] = cell.Cell.Id
 	params["cell_name"] = cell.Cell.Name
 	eventCtx := router.EventContext{
-		Name: macro.Title,
-		Event: params }
+		Name:  macro.Title,
+		Event: params}
 	response, err := c.CallMacro(context.Background(), &eventCtx)
 	if err != nil {
-		log.Error("Error when calling CallMacro: " + err.Error())
+		utils.Log(logrus.ErrorLevel, "Error when calling CallMacro: "+err.Error())
 		return err
 	}
 	if response.Error {
-		log.Info("macro resulted in error: " + response.Msg)
-		return errors.New( response.Msg )
+		utils.Log(logrus.InfoLevel, "macro resulted in error: "+response.Msg)
+		return errors.New(response.Msg)
 	}
-	log.Info("Response from server: " + response.Result)
+	utils.Log(logrus.InfoLevel, "Response from server: "+response.Result)
 	return nil
 }
 
 type MacroManager struct {
 	ManagerContext *types.Context
-	Flow *types.Flow
+	Flow           *types.Flow
 }
 
-func NewMacroManager(mngrCtx *types.Context, flow *types.Flow) (*MacroManager) {
+func NewMacroManager(mngrCtx *types.Context, flow *types.Flow) *MacroManager {
 	//rootCtx, _ := context.WithCancel(context.Background())
 	item := MacroManager{
-		ManagerContext:mngrCtx,
-		Flow: flow}
+		ManagerContext: mngrCtx,
+		Flow:           flow}
 	return &item
 }
 
 func (man *MacroManager) executeMacro() {
-	log := man.ManagerContext.Log
 	cell := man.ManagerContext.Cell
 	channel := man.ManagerContext.Channel
 	flow := man.ManagerContext.Flow
 	model := cell.Model
-	log.Debug("running macro script..");
+	utils.Log(logrus.DebugLevel, "running macro script..")
 
 	function := model.Data["function"].(types.ModelDataStr).Value
 	params := model.Data["params"].(types.ModelDataObj).Value
 
-	completed, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Completed")
-	errorLink, _ := utils.FindLinkByName( cell.SourceLinks, "source", "Error")
+	completed, _ := utils.FindLinkByName(cell.SourceLinks, "source", "Completed")
+	errorLink, _ := utils.FindLinkByName(cell.SourceLinks, "source", "Error")
 
 	var foundFn *types.WorkspaceMacro
 
-
-
 	// find the code
 	for _, macro := range flow.WorkspaceFns {
-		if macro.Title ==  function {
+		if macro.Title == function {
 			foundFn = macro
 		}
 	}
 
 	if foundFn == nil {
-		log.Debug("could not find macro function...")
+		utils.Log(logrus.DebugLevel, "could not find macro function...")
 		resp := types.ManagerResponse{
 			Channel: channel,
-			Link: errorLink }
+			Link:    errorLink}
 		man.ManagerContext.RecvChannel <- &resp
 		return
 	}
@@ -108,18 +107,18 @@ func (man *MacroManager) executeMacro() {
 	//err := man.initializeK8sAndExecute(sEnc)
 
 	if err != nil {
-		log.Error("error occured: " + err.Error());
+		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		resp := types.ManagerResponse{
 			Channel: channel,
-			Link: errorLink }
+			Link:    errorLink}
 		man.ManagerContext.RecvChannel <- &resp
 		return
 	}
 	resp := types.ManagerResponse{
 		Channel: channel,
-		Link: completed }
+		Link:    completed}
 	man.ManagerContext.RecvChannel <- &resp
 }
 func (man *MacroManager) StartProcessing() {
-	go man.executeMacro();
+	go man.executeMacro()
 }
