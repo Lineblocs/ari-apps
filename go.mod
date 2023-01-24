@@ -14,11 +14,9 @@ require (
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.4.2
-	github.com/inconshreveable/log15 v0.0.0-20201112154412-8562bdadbbac
 	github.com/innix/logrus-cloudwatch v1.0.0
 	github.com/joho/godotenv v1.4.0
 	github.com/rotisserie/eris v0.5.1
-	github.com/rs/zerolog v1.28.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/t-tomalak/logrus-easy-formatter v0.0.0-20190827215021-c074f06c5816
 	github.com/u2takey/ffmpeg-go v0.3.0
@@ -56,6 +54,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
+	github.com/inconshreveable/log15 v0.0.0-20201112154412-8562bdadbbac // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect

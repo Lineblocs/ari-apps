@@ -3,23 +3,18 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	_ "github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 
-	"github.com/rotisserie/eris"
-
 	"github.com/CyCoreSystems/ari-proxy/v5/client"
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/CyCoreSystems/ari/v5/client/native"
-	"github.com/CyCoreSystems/ari/v5/rid"
 	"lineblocs.com/processor/api"
 	"lineblocs.com/processor/grpc"
 	"lineblocs.com/processor/logger"
@@ -35,11 +30,6 @@ var bridge *ari.BridgeHandle
 type APIResponse struct {
 	Headers http.Header
 	Body    []byte
-}
-
-func logFormattedMsg(msg string) {
-	utils.Log(logrus.DebugLevel, fmt.Sprintf("msg = %s", msg))
-
 }
 
 func createARIConnection(connectCtx context.Context) (ari.Client, error) {
@@ -74,345 +64,6 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
 		URL:          ariUrl,
 		WebsocketURL: wsUrl})
 	return cl, err
-}
-
-func endBridgeCall(lineBridge *types.LineBridge) {
-	utils.Log(logrus.DebugLevel, "ending ALL bridge calls..")
-	for _, item := range lineBridge.Channels {
-		utils.Log(logrus.DebugLevel, "ending call: "+item.Channel.Key().ID)
-		utils.SafeHangup(item)
-	}
-
-	// TODO:  billing
-
-}
-
-func startListeningForRingTimeout(timeout int, bridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan <-chan bool) {
-	utils.Log(logrus.DebugLevel, "starting ring timeout checker..")
-	utils.Log(logrus.DebugLevel, "timeout set for: "+strconv.Itoa(timeout))
-	duration := time.Now().Add(time.Duration(timeout) * time.Second)
-
-	// Create a context that is both manually cancellable and will signal
-	// a cancel at the specified duration.
-	ringCtx, cancel := context.WithDeadline(context.Background(), duration)
-	defer cancel()
-	wg.Done()
-	for {
-		select {
-		case <-ringTimeoutChan:
-			utils.Log(logrus.DebugLevel, "bridge in session. stopping ring timeout")
-			return
-		case <-ringCtx.Done():
-			utils.Log(logrus.DebugLevel, "Ring timeout elapsed.. ending all calls")
-			endBridgeCall(bridge)
-			return
-		}
-	}
-}
-
-func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types.LineChannel, outboundChannel *types.LineChannel, wg *sync.WaitGroup) {
-	h := bridge.Bridge
-
-	utils.Log(logrus.DebugLevel, "manageBridge called..")
-	// Delete the bridge when we exit
-	defer h.Delete()
-
-	destroySub := h.Subscribe(ari.Events.BridgeDestroyed)
-	defer destroySub.Cancel()
-
-	enterSub := h.Subscribe(ari.Events.ChannelEnteredBridge)
-	defer enterSub.Cancel()
-
-	leaveSub := h.Subscribe(ari.Events.ChannelLeftBridge)
-	defer leaveSub.Cancel()
-
-	wg.Done()
-	utils.Log(logrus.DebugLevel, "listening for bridge events...")
-	var numChannelsEntered int = 0
-	for {
-		select {
-		case <-destroySub.Events():
-			utils.Log(logrus.DebugLevel, "bridge destroyed")
-			return
-		case e, ok := <-enterSub.Events():
-			if !ok {
-				utils.Log(logrus.ErrorLevel, "channel entered subscription closed")
-				return
-			}
-
-			v := e.(*ari.ChannelEnteredBridge)
-			numChannelsEntered += 1
-
-			utils.Log(logrus.DebugLevel, "channel entered bridge "+"channel "+v.Channel.Name)
-			utils.Log(logrus.DebugLevel, "num channels in bridge: "+strconv.Itoa(numChannelsEntered))
-
-		case e, ok := <-leaveSub.Events():
-			if !ok {
-				utils.Log(logrus.ErrorLevel, "channel left subscription closed")
-				return
-			}
-			v := e.(*ari.ChannelLeftBridge)
-			utils.Log(logrus.DebugLevel, "channel left bridge"+" channel "+v.Channel.Name)
-			utils.Log(logrus.DebugLevel, "ending all calls in bridge...")
-			// end both calls
-			utils.SafeHangup(lineChannel)
-			utils.SafeHangup(outboundChannel)
-
-			utils.Log(logrus.DebugLevel, "updating call status...")
-			api.UpdateCall(call, "ended")
-		}
-	}
-}
-
-func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) error {
-
-	endSub := outboundChannel.Channel.Subscribe(ari.Events.StasisEnd)
-	defer endSub.Cancel()
-	startSub := outboundChannel.Channel.Subscribe(ari.Events.StasisStart)
-
-	defer startSub.Cancel()
-	destroyedSub := outboundChannel.Channel.Subscribe(ari.Events.ChannelDestroyed)
-	defer destroyedSub.Cancel()
-	wg.Done()
-	utils.Log(logrus.DebugLevel, "managing outbound call...")
-	utils.Log(logrus.DebugLevel, "listening for channel events...")
-
-	for {
-
-		select {
-		case <-startSub.Events():
-			utils.Log(logrus.DebugLevel, "started call..")
-
-			if err := lineBridge.Bridge.AddChannel(outboundChannel.Channel.Key().ID); err != nil {
-				utils.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
-				return err
-			}
-			utils.Log(logrus.DebugLevel, "added outbound channel to bridge..")
-			lineChannel.Channel.StopRing()
-			ringTimeoutChan <- true
-		case <-endSub.Events():
-			utils.Log(logrus.DebugLevel, "ended call..")
-			lineChannel.Channel.StopRing()
-			lineChannel.Channel.Hangup()
-			//endBridgeCall(lineBridge)
-		case <-destroyedSub.Events():
-			utils.Log(logrus.DebugLevel, "channel destroyed..")
-			lineChannel.Channel.StopRing()
-			lineChannel.Channel.Hangup()
-			//endBridgeCall(lineBridge)
-
-		}
-	}
-}
-
-func ensureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string, addedHeaders *[]string) error {
-	utils.Log(logrus.DebugLevel, "ensureBridge called..")
-	var bridge *ari.BridgeHandle
-	var err error
-
-	key := src.New(ari.BridgeKey, rid.New(rid.Bridge))
-	bridge, err = cl.Bridge().Create(key, "mixing", key.ID)
-	if err != nil {
-		bridge = nil
-		return eris.Wrap(err, "failed to create bridge")
-	}
-	outChannel := types.LineChannel{}
-	lineBridge := types.NewBridge(bridge)
-
-	utils.Log(logrus.InfoLevel, "channel added to bridge")
-	outboundChannel, err := cl.Channel().Create(nil, utils.CreateChannelRequest(numberToCall))
-
-	if err != nil {
-		utils.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
-		return err
-	}
-
-	utils.Log(logrus.DebugLevel, "Originating call...")
-
-	params := types.CallParams{
-		From:        callerId,
-		To:          numberToCall,
-		Status:      "start",
-		Direction:   "outbound",
-		UserId:      user.Id,
-		WorkspaceId: user.Workspace.Id,
-		ChannelId:   outboundChannel.ID()}
-	body, err := json.Marshal(params)
-	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
-		return err
-	}
-
-	utils.Log(logrus.InfoLevel, "creating call...")
-	utils.Log(logrus.InfoLevel, "calling "+numberToCall)
-	resp, err := api.SendHttpRequest("/call/createCall", body)
-
-	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
-		return err
-	}
-	id := resp.Headers.Get("x-call-id")
-	utils.Log(logrus.DebugLevel, "Call ID is: "+id)
-	idAsInt, err := strconv.Atoi(id)
-
-	call := types.Call{
-		CallId:  idAsInt,
-		Channel: lineChannel,
-		Started: time.Now(),
-		Params:  &params}
-
-	domain := user.Workspace.Domain
-	apiCallId := strconv.Itoa(call.CallId)
-	headers := utils.CreateSIPHeaders(domain, callerId, typeOfCall, apiCallId, addedHeaders)
-	outboundChannel, err = outboundChannel.Originate(utils.CreateOriginateRequest(callerId, numberToCall, headers))
-	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
-		return err
-	}
-
-	stopChannel := make(chan bool)
-	outChannel.Channel = outboundChannel
-	wg := new(sync.WaitGroup)
-	wg.Add(1)
-	go manageBridge(lineBridge, &call, lineChannel, &outChannel, wg)
-	wg.Wait()
-	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
-		utils.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
-		return errors.New("failed to add channel to bridge")
-	}
-
-	utils.Log(logrus.InfoLevel, "creating outbound call...")
-	resp, err = api.SendHttpRequest("/call/createCall", body)
-	_, err = utils.CreateCall(resp.Headers.Get("x-call-id"), &outChannel, &params)
-
-	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
-		return err
-	}
-
-	lineChannel.Channel.Ring()
-	wg1 := new(sync.WaitGroup)
-	wg1.Add(1)
-	utils.AddChannelToBridge(lineBridge, lineChannel)
-	utils.AddChannelToBridge(lineBridge, &outChannel)
-	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, wg1, stopChannel)
-	wg1.Wait()
-
-	timeout := 30
-	wg2 := new(sync.WaitGroup)
-	wg2.Add(1)
-	go startListeningForRingTimeout(timeout, lineBridge, wg2, stopChannel)
-	wg2.Wait()
-
-	return nil
-}
-
-func processSIPTrunkCall(
-	cl ari.Client,
-	src *ari.Key,
-	user *types.User,
-	lineChannel *types.LineChannel,
-	callerId string,
-	exten string,
-	trunkAddr string) error {
-	utils.Log(logrus.DebugLevel, "ensureBridge called..")
-	var bridge *ari.BridgeHandle
-	var err error
-	key := src.New(ari.BridgeKey, rid.New(rid.Bridge))
-	bridge, err = cl.Bridge().Create(key, "mixing", key.ID)
-	if err != nil {
-		bridge = nil
-		return eris.Wrap(err, "failed to create bridge")
-	}
-	outChannel := types.LineChannel{}
-	lineBridge := types.NewBridge(bridge)
-
-	utils.Log(logrus.InfoLevel, "channel added to bridge")
-	outboundChannel, err := cl.Channel().Create(nil, utils.CreateChannelRequest(exten))
-
-	if err != nil {
-		utils.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
-		return err
-	}
-
-	utils.Log(logrus.DebugLevel, "Originating call...")
-
-	params := types.CallParams{
-		From:        callerId,
-		To:          exten,
-		Status:      "start",
-		Direction:   "inbound",
-		UserId:      user.Id,
-		WorkspaceId: user.Workspace.Id,
-		ChannelId:   outboundChannel.ID()}
-	body, err := json.Marshal(params)
-	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
-		return err
-	}
-
-	utils.Log(logrus.InfoLevel, "creating call...")
-	utils.Log(logrus.InfoLevel, "calling "+exten)
-	resp, err := api.SendHttpRequest("/call/createCall", body)
-
-	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
-		return err
-	}
-	id := resp.Headers.Get("x-call-id")
-	utils.Log(logrus.DebugLevel, "Call ID is: "+id)
-	idAsInt, err := strconv.Atoi(id)
-
-	call := types.Call{
-		CallId:  idAsInt,
-		Channel: lineChannel,
-		Started: time.Now(),
-		Params:  &params}
-
-	domain := user.Workspace.Domain
-	apiCallId := strconv.Itoa(call.CallId)
-	headers := utils.CreateSIPHeadersForSIPTrunkCall(domain, callerId, "pstn", apiCallId, trunkAddr)
-	outboundChannel, err = outboundChannel.Originate(utils.CreateOriginateRequest(callerId, exten, headers))
-	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
-		return err
-	}
-
-	stopChannel := make(chan bool)
-	outChannel.Channel = outboundChannel
-	wg := new(sync.WaitGroup)
-	wg.Add(1)
-	go manageBridge(lineBridge, &call, lineChannel, &outChannel, wg)
-	wg.Wait()
-	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
-		utils.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
-		return errors.New("failed to add channel to bridge")
-	}
-
-	utils.Log(logrus.InfoLevel, "creating outbound call...")
-	resp, err = api.SendHttpRequest("/call/createCall", body)
-	_, err = utils.CreateCall(resp.Headers.Get("x-call-id"), &outChannel, &params)
-
-	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
-		return err
-	}
-
-	lineChannel.Channel.Ring()
-	wg1 := new(sync.WaitGroup)
-	wg1.Add(1)
-	utils.AddChannelToBridge(lineBridge, lineChannel)
-	utils.AddChannelToBridge(lineBridge, &outChannel)
-	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, wg1, stopChannel)
-	wg1.Wait()
-
-	timeout := 30
-	wg2 := new(sync.WaitGroup)
-	wg2.Add(1)
-	go startListeningForRingTimeout(timeout, lineBridge, wg2, stopChannel)
-	wg2.Wait()
-
-	return nil
 }
 
 func main() {
@@ -617,7 +268,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 		lineChannel := types.LineChannel{
 			Channel: h}
-		err = processSIPTrunkCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, trunkAddr)
+		err = utils.ProcessSIPTrunkCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, trunkAddr)
 		if err != nil {
 			utils.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
@@ -643,7 +294,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		if utils.CheckFreeTrial(data.Plan) {
 			utils.Log(logrus.ErrorLevel, "Ending call due to free trial")
 			h.Hangup()
-			logFormattedMsg(logger.FREE_TRIAL_ENDED)
+			utils.Log(logrus.DebugLevel, fmt.Sprintf("msg = %s", logger.FREE_TRIAL_ENDED))
 			return
 		}
 		err = json.Unmarshal([]byte(data.FlowJson), &flowJson)
@@ -702,7 +353,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
 		fmt.Printf("Calling %s\r\n", exten)
 		h.Answer()
-		err = ensureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension", nil)
+		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension", nil)
 		if err != nil {
 			utils.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
@@ -736,7 +387,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		}
 		fmt.Printf("setup caller id: " + callerInfo.CallerId)
 		h.Answer()
-		err = ensureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn", nil)
+		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn", nil)
 		if err != nil {
 			utils.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
@@ -766,7 +417,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		h.Answer()
 		headers := make([]string, 0)
 		headers = append(headers, "X-Lineblocs-User-SIP-Trunk-Calling-PSTN: true")
-		err = ensureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn", &headers)
+		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn", &headers)
 		if err != nil {
 			utils.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
