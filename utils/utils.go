@@ -187,20 +187,6 @@ func LookupCellVariable(flow *types.Flow, name string, lookup string) (string, e
 	return "", errors.New("Could not find link")
 }
 
-func CreateCall(id string, channel *types.LineChannel, params *types.CallParams) (*types.Call, error) {
-	idAsInt, err := strconv.Atoi(id)
-	if err != nil {
-		return nil, err
-	}
-
-	call := types.Call{
-		CallId:  idAsInt,
-		Channel: channel,
-		Started: time.Now(),
-		Params:  params}
-	return &call, nil
-}
-
 // TODO call API to get proxy IPs
 func GetSIPProxy() string {
 	//return "proxy1";
@@ -264,12 +250,6 @@ func DetermineNumberToCall(data map[string]types.ModelData) (string, error) {
 		return ext.Value, nil
 	}
 	return "", errors.New("Unknown call type")
-}
-
-func SafeHangup(lineChannel *types.LineChannel) {
-	if lineChannel.Channel != nil {
-		lineChannel.Channel.Hangup()
-	}
 }
 
 func GetSIPSecretKey() string {
@@ -581,20 +561,6 @@ func changeAudioEncoding(filepath string, ext string) (string, error) {
 
 }
 
-func AddChannelToBridge(bridge *types.LineBridge, channel *types.LineChannel) {
-	bridge.Channels = append(bridge.Channels, channel)
-}
-
-func RemoveChannelFromBridge(bridge *types.LineBridge, channel *types.LineChannel) {
-	channels := make([]*types.LineChannel, 0)
-	for _, item := range bridge.Channels {
-		if item.Channel.ID() != channel.Channel.ID() {
-			channels = append(channels, item)
-		}
-	}
-	bridge.Channels = channels
-}
-
 func ParseRingTimeout(value types.ModelData) int {
 
 	item, ok := value.(types.ModelDataStr)
@@ -739,7 +705,7 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 
 	Log(logrus.InfoLevel, "creating outbound call...")
 	resp, err = api.SendHttpRequest("/call/createCall", body)
-	_, err = CreateCall(resp.Headers.Get("x-call-id"), &outChannel, &params)
+	_, err = outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
 		Log(logrus.ErrorLevel, "error occured: "+err.Error())
@@ -749,15 +715,15 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	lineChannel.Channel.Ring()
 	wg1 := new(sync.WaitGroup)
 	wg1.Add(1)
-	AddChannelToBridge(lineBridge, lineChannel)
-	AddChannelToBridge(lineBridge, &outChannel)
+	lineBridge.AddChannel(lineChannel)
+	lineBridge.AddChannel(&outChannel)
 	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, wg1, stopChannel)
 	wg1.Wait()
 
 	timeout := 30
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
-	go startListeningForRingTimeout(timeout, lineBridge, wg2, stopChannel)
+	go lineBridge.StartWaitingForRingTimeout(timeout, wg2, stopChannel)
 	wg2.Wait()
 
 	return nil
@@ -808,8 +774,8 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types
 			Log(logrus.DebugLevel, "channel left bridge"+" channel "+v.Channel.Name)
 			Log(logrus.DebugLevel, "ending all calls in bridge...")
 			// end both calls
-			SafeHangup(lineChannel)
-			SafeHangup(outboundChannel)
+			lineChannel.SafeHangup()
+			outboundChannel.SafeHangup()
 
 			Log(logrus.DebugLevel, "updating call status...")
 			api.UpdateCall(call, "ended")
@@ -847,49 +813,15 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 			Log(logrus.DebugLevel, "ended call..")
 			lineChannel.Channel.StopRing()
 			lineChannel.Channel.Hangup()
-			//endBridgeCall(lineBridge)
+			//lineBridge.EndBridgeCall()
 		case <-destroyedSub.Events():
 			Log(logrus.DebugLevel, "channel destroyed..")
 			lineChannel.Channel.StopRing()
 			lineChannel.Channel.Hangup()
-			//endBridgeCall(lineBridge)
+			//lineBridge.EndBridgeCall()
 
 		}
 	}
-}
-
-func startListeningForRingTimeout(timeout int, bridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan <-chan bool) {
-	Log(logrus.DebugLevel, "starting ring timeout checker..")
-	Log(logrus.DebugLevel, "timeout set for: "+strconv.Itoa(timeout))
-	duration := time.Now().Add(time.Duration(timeout) * time.Second)
-
-	// Create a context that is both manually cancellable and will signal
-	// a cancel at the specified duration.
-	ringCtx, cancel := context.WithDeadline(context.Background(), duration)
-	defer cancel()
-	wg.Done()
-	for {
-		select {
-		case <-ringTimeoutChan:
-			Log(logrus.DebugLevel, "bridge in session. stopping ring timeout")
-			return
-		case <-ringCtx.Done():
-			Log(logrus.DebugLevel, "Ring timeout elapsed.. ending all calls")
-			EndBridgeCall(bridge)
-			return
-		}
-	}
-}
-
-func EndBridgeCall(lineBridge *types.LineBridge) {
-	Log(logrus.DebugLevel, "ending ALL bridge calls..")
-	for _, item := range lineBridge.Channels {
-		Log(logrus.DebugLevel, "ending call: "+item.Channel.Key().ID)
-		SafeHangup(item)
-	}
-
-	// TODO:  billing
-
 }
 
 func ProcessSIPTrunkCall(
@@ -976,7 +908,7 @@ func ProcessSIPTrunkCall(
 
 	Log(logrus.InfoLevel, "creating outbound call...")
 	resp, err = api.SendHttpRequest("/call/createCall", body)
-	_, err = CreateCall(resp.Headers.Get("x-call-id"), &outChannel, &params)
+	_, err = outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
 		Log(logrus.ErrorLevel, "error occured: "+err.Error())
@@ -986,15 +918,15 @@ func ProcessSIPTrunkCall(
 	lineChannel.Channel.Ring()
 	wg1 := new(sync.WaitGroup)
 	wg1.Add(1)
-	AddChannelToBridge(lineBridge, lineChannel)
-	AddChannelToBridge(lineBridge, &outChannel)
+	lineBridge.AddChannel(lineChannel)
+	lineBridge.AddChannel(&outChannel)
 	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, wg1, stopChannel)
 	wg1.Wait()
 
 	timeout := 30
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
-	go startListeningForRingTimeout(timeout, lineBridge, wg2, stopChannel)
+	go lineBridge.StartWaitingForRingTimeout(timeout, wg2, stopChannel)
 	wg2.Wait()
 
 	return nil

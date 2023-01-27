@@ -1,53 +1,56 @@
-package grpc;
+package grpc
 
 import (
-	"fmt"
-	"time"
-	"errors"
-	"strconv"
-	"github.com/google/uuid"
 	"encoding/json"
-	"golang.org/x/net/context"
+	"errors"
+	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/CyCoreSystems/ari/v5"
+	"github.com/google/uuid"
+	"golang.org/x/net/context"
+
 	//"github.com/CyCoreSystems/ari/v5/client/native"
 	"github.com/CyCoreSystems/ari/v5/rid"
-	"google.golang.org/grpc/metadata"
 	"github.com/rotisserie/eris"
 	codes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	status "google.golang.org/grpc/status"
+	"lineblocs.com/processor/api"
+	"lineblocs.com/processor/helpers"
+	"lineblocs.com/processor/mngrs"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
-	"lineblocs.com/processor/helpers"
-	"lineblocs.com/processor/api"
-	"lineblocs.com/processor/mngrs"
 )
 
 type Server struct {
 	Client ari.Client
 	WsChan chan<- *ClientEvent
 }
-func (s *Server) lookupBridge( bridgeId string ) (*types.LineBridge, error) {
+
+func (s *Server) lookupBridge(bridgeId string) (*types.LineBridge, error) {
 	src := ari.NewKey(ari.BridgeKey, bridgeId)
 	bridge := s.Client.Bridge().Get(src)
 
-	return &types.LineBridge{ Bridge: bridge }, nil
+	return &types.LineBridge{Bridge: bridge}, nil
 }
 
-func (s *Server) lookupChannel( channelId string ) (*types.LineChannel, error) {
+func (s *Server) lookupChannel(channelId string) (*types.LineChannel, error) {
 	src := ari.NewKey(ari.ChannelKey, channelId)
 	channel := s.Client.Channel().Get(src)
 
-	return &types.LineChannel{ Channel: channel }, nil
+	return &types.LineChannel{Channel: channel}, nil
 }
 
-func (s *Server) lookupRecording( recordingId string ) (*helpers.Record, error) {
+func (s *Server) lookupRecording(recordingId string) (*helpers.Record, error) {
 	src := ari.NewKey(ari.LiveRecordingKey, recordingId)
 	rec := s.Client.LiveRecording().Get(src)
 
-	return &helpers.Record{ Handle: rec }, nil
+	return &helpers.Record{Handle: rec}, nil
 }
-func (s *Server) safeSendToWS( clientid string, evt *ClientEvent ) {
-	wsChan := lookupWSChan( clientid )
+func (s *Server) safeSendToWS(clientid string, evt *ClientEvent) {
+	wsChan := lookupWSChan(clientid)
 	if wsChan != nil {
 		fmt.Println("sending back to WS")
 		wsChan <- evt
@@ -55,7 +58,7 @@ func (s *Server) safeSendToWS( clientid string, evt *ClientEvent ) {
 	}
 	fmt.Println("could not find WS to send to")
 }
-func (s *Server) startProcessingBridge( bridge *types.LineBridge, clientId string ) () {
+func (s *Server) startProcessingBridge(bridge *types.LineBridge, clientId string) {
 	h := bridge.Bridge
 	// Delete the bridge when we exit
 	defer h.Delete()
@@ -88,13 +91,13 @@ func (s *Server) startProcessingBridge( bridge *types.LineBridge, clientId strin
 				data["bridge_id"] = h.ID()
 				data["channel_id"] = channelId
 				//data["channel_id"] = req.ChannelId
-				evt:= ClientEvent{
+				evt := ClientEvent{
 					ClientId: clientId,
-					Type: "bridge_ChannelJoined",
-					Data: data }
+					Type:     "bridge_ChannelJoined",
+					Data:     data}
 
 				fmt.Println("sending client event..")
-				s.safeSendToWS( clientId, &evt )
+				s.safeSendToWS(clientId, &evt)
 			})
 		case e, ok := <-leaveSub.Events():
 			if !ok {
@@ -108,36 +111,36 @@ func (s *Server) startProcessingBridge( bridge *types.LineBridge, clientId strin
 				data["bridge_id"] = h.ID()
 				data["channel_id"] = channelId
 				//data["channel_id"] = req.ChannelId
-				evt:= ClientEvent{
+				evt := ClientEvent{
 					ClientId: clientId,
-					Type: "bridge_ChannelLeft",
-					Data: data }
+					Type:     "bridge_ChannelLeft",
+					Data:     data}
 				fmt.Println("sending client event..")
-				s.safeSendToWS( clientId, &evt )
+				s.safeSendToWS(clientId, &evt)
 			})
 		}
 	}
 }
 
-func (s *Server) addBridgeChannel( bridge *types.LineBridge, channel *types.LineChannel ) (error) {
+func (s *Server) addBridgeChannel(bridge *types.LineBridge, channel *types.LineChannel) error {
 	err := bridge.Bridge.AddChannel(channel.Channel.Key().ID)
 	if err != nil {
 		return err
 	}
-	utils.AddChannelToBridge(bridge, channel)
+	bridge.AddChannel(channel)
 	return nil
 }
 
-func (s *Server) removeBridgeChannel( bridge *types.LineBridge, channel *types.LineChannel ) (error) {
+func (s *Server) removeBridgeChannel(bridge *types.LineBridge, channel *types.LineChannel) error {
 	err := bridge.Bridge.RemoveChannel(channel.Channel.Key().ID)
 	if err != nil {
 		return err
 	}
-	utils.RemoveChannelFromBridge(bridge, channel)
+	bridge.RemoveChannel(channel)
 	return nil
 }
 
-func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, clientId string, ringTimeoutChan chan<- bool) () {
+func (s *Server) manageCall(call *types.Call, callChannel *types.LineChannel, clientId string, ringTimeoutChan chan<- bool) {
 	h := callChannel.Channel
 	// Delete the bridge when we exit
 	endSub := h.Subscribe(ari.Events.StasisEnd)
@@ -168,12 +171,12 @@ func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, c
 				data["dtmf_gathered"] = dtmfGathered
 				data["digit"] = digit
 				//data["channel_id"] = req.ChannelId
-				evt:= ClientEvent{
+				evt := ClientEvent{
 					ClientId: clientId,
-					Type: "channel_DTMFReceived",
-					Data: data }
+					Type:     "channel_DTMFReceived",
+					Data:     data}
 				fmt.Println("sending client event..")
-				s.safeSendToWS( clientId, &evt )
+				s.safeSendToWS(clientId, &evt)
 			})
 		case e := <-startSub.Events():
 
@@ -185,14 +188,14 @@ func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, c
 				// send to channel
 				data := make(map[string]string)
 				data["channel_id"] = channelId
-				data["call_id"] = strconv.Itoa( call.CallId )
+				data["call_id"] = strconv.Itoa(call.CallId)
 				//data["channel_id"] = req.ChannelId
-				evt:= ClientEvent{
+				evt := ClientEvent{
 					ClientId: clientId,
-					Type: "channel_ChannelStart",
-					Data: data }
+					Type:     "channel_ChannelStart",
+					Data:     data}
 				fmt.Println("sending client event..")
-				s.safeSendToWS( clientId, &evt )
+				s.safeSendToWS(clientId, &evt)
 			})
 		case e, ok := <-endSub.Events():
 			if !ok {
@@ -207,13 +210,13 @@ func (s *Server) manageCall( call *types.Call, callChannel *types.LineChannel, c
 				data["bridge_id"] = h.ID()
 				data["channel_id"] = channelId
 				//data["channel_id"] = req.ChannelId
-				evt:= ClientEvent{
+				evt := ClientEvent{
 					ClientId: clientId,
-					Type: "channel_ChannelEnd",
-					Data: data }
+					Type:     "channel_ChannelEnd",
+					Data:     data}
 
 				fmt.Println("sending client event..")
-				s.safeSendToWS( clientId, &evt )
+				s.safeSendToWS(clientId, &evt)
 			})
 		}
 	}
@@ -232,52 +235,30 @@ func (s *Server) managePrompt(playback *ari.PlaybackHandle, clientId string) {
 				// send to channel
 				data := make(map[string]string)
 				data["playback_id"] = playback.ID()
-				evt:= ClientEvent{
+				evt := ClientEvent{
 					ClientId: clientId,
-					Type: "playback_PlaybackFinished",
-					Data: data }
-					fmt.Println("sending client event..")
-				s.safeSendToWS( clientId, &evt )
+					Type:     "playback_PlaybackFinished",
+					Data:     data}
+				fmt.Println("sending client event..")
+				s.safeSendToWS(clientId, &evt)
 			})
 			return
 		}
 	}
 }
 
-func (s *Server) startListeningForRingTimeout(timeout int, channel *types.LineChannel, ringTimeoutChan <-chan bool) {
-    duration := time.Now().Add(time.Duration( timeout ) * time.Second)
-
-    // Create a context that is both manually cancellable and will signal
-    // a cancel at the specified duration.
-    ringCtx, cancel := context.WithDeadline(context.Background(), duration)
-    defer cancel()
-	for {
-    select {
-		case <-ringTimeoutChan:
-				fmt.Println("bridge in session. stopping ring timeout")
-				return
-			case <-ringCtx.Done():
-				fmt.Println("Ring timeout elapsed.. ending all calls")
-				utils.SafeHangup( channel )
-				return
-    }
-}
-}
-
-
-
-func NewServer(cl ari.Client, wsChan chan<- *ClientEvent) (*Server) {
+func NewServer(cl ari.Client, wsChan chan<- *ClientEvent) *Server {
 	srv := Server{
 		Client: cl,
-		WsChan: wsChan }
-		return &srv
+		WsChan: wsChan}
+	return &srv
 }
 
 type event func()
-func (s *Server) dispatchEvent( handler event ) {
+
+func (s *Server) dispatchEvent(handler event) {
 	go func() {
 		time.Sleep(time.Duration(500) * time.Millisecond)
-
 
 		// call the handler
 		handler()
@@ -285,8 +266,8 @@ func (s *Server) dispatchEvent( handler event ) {
 }
 
 func (s *Server) CreateBridge(ctx context.Context, req *BridgeRequest) (*BridgeReply, error) {
-	fmt.Println("creating bridge!!!");
-	//var bridge *ari.BridgeHandle 
+	fmt.Println("creating bridge!!!")
+	//var bridge *ari.BridgeHandle
 	var err error
 	headers, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -302,27 +283,27 @@ func (s *Server) CreateBridge(ctx context.Context, req *BridgeRequest) (*BridgeR
 	}
 
 	reply := BridgeReply{
-		BridgeId: key.ID }
+		BridgeId: key.ID}
 
 	s.dispatchEvent(func() {
 		// send to channel
 		data := make(map[string]string)
 		data["bridge_id"] = key.ID
-		evt:= ClientEvent{
+		evt := ClientEvent{
 			ClientId: clientId,
-			Type: "bridge_BridgeCreated",
-			Data: data }
-			fmt.Println("sending client event..")
-		s.safeSendToWS( clientId, &evt )
+			Type:     "bridge_BridgeCreated",
+			Data:     data}
+		fmt.Println("sending client event..")
+		s.safeSendToWS(clientId, &evt)
 	})
 
 	lineBridge := types.LineBridge{
-		Bridge: bridge }
-	go s.startProcessingBridge( &lineBridge, clientId )
+		Bridge: bridge}
+	go s.startProcessingBridge(&lineBridge, clientId)
 	return &reply, nil
 }
 func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, error) {
-	//var bridge *ari.BridgeHandle 
+	//var bridge *ari.BridgeHandle
 	var err error
 	headers, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -352,64 +333,64 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 
 	fmt.Println("Calling: " + numberToCall)
 
-	timeout := utils.ParseRingTimeout( req.Timeout )
+	timeout := utils.ParseRingTimeout(req.Timeout)
 
 	outChannel := types.LineChannel{}
-	outboundChannel, err := s.Client.Channel().Create(nil, utils.CreateChannelRequest( numberToCall )	)
+	outboundChannel, err := s.Client.Channel().Create(nil, utils.CreateChannelRequest(numberToCall))
 
 	if err != nil {
 		fmt.Println("error creating outbound channel: " + err.Error())
 		return nil, err
 	}
-	user, err := strconv.Atoi( userId )
+	user, err := strconv.Atoi(userId)
 	if err != nil {
-		fmt.Println( "error occured: " + err.Error() )
+		fmt.Println("error occured: " + err.Error())
 		return nil, err
 	}
 
-	workspace, err := strconv.Atoi( workspaceId )
+	workspace, err := strconv.Atoi(workspaceId)
 	if err != nil {
-		fmt.Println( "error occured: " + err.Error() )
+		fmt.Println("error occured: " + err.Error())
 		return nil, err
 	}
 	params := types.CallParams{
-		From: callerId,
-		To: numberToCall,
-		Status: "start",
-		Direction: "outbound",
-		UserId:  user,
+		From:        callerId,
+		To:          numberToCall,
+		Status:      "start",
+		Direction:   "outbound",
+		UserId:      user,
 		WorkspaceId: workspace,
-		ChannelId: outboundChannel.ID() }
-	body, err := json.Marshal( params )
+		ChannelId:   outboundChannel.ID()}
+	body, err := json.Marshal(params)
 	if err != nil {
-		fmt.Println( "error occured: " + err.Error() )
+		fmt.Println("error occured: " + err.Error())
 		return nil, err
 	}
 
 	fmt.Println("creating outbound call...")
-	resp, err := api.SendHttpRequest( "/call/createCall", body )
-	call, err := utils.CreateCall( resp.Headers.Get("x-call-id"), &outChannel, &params)
+	resp, err := api.SendHttpRequest("/call/createCall", body)
+	call, err := outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
-		fmt.Println( "error occured: " + err.Error() )
+		fmt.Println("error occured: " + err.Error())
 		return nil, err
 	}
-	callType :=  req.CallType
-	apiCallId := strconv.Itoa( call.CallId )
+	callType := req.CallType
+	apiCallId := strconv.Itoa(call.CallId)
 	sipHeaders := utils.CreateSIPHeaders(domain, callerId, callType, apiCallId, nil)
-	outboundChannel, err = outboundChannel.Originate( utils.CreateOriginateRequest(callerId, numberToCall, sipHeaders) )
+	outboundChannel, err = outboundChannel.Originate(utils.CreateOriginateRequest(callerId, numberToCall, sipHeaders))
 
 	if err != nil {
-		fmt.Println( "error occured: " + err.Error() )
+		fmt.Println("error occured: " + err.Error())
 		return nil, err
 	}
 	outChannel.Channel = outboundChannel
-	stopChannel := make( chan bool, 1 )
-	go s.manageCall( call, &outChannel, clientId, stopChannel )
-	go s.startListeningForRingTimeout(timeout, &outChannel, stopChannel)
+	stopChannel := make(chan bool, 1)
+	go s.manageCall(call, &outChannel, clientId, stopChannel)
+	go outChannel.StartWaitingForRingTimeout(nil, nil, timeout, nil, stopChannel, "server")
 	reply := CallReply{
 		ChannelId: outChannel.Channel.ID(),
-		CallId: strconv.Itoa( call.CallId ) }
+		CallId:    strconv.Itoa(call.CallId)}
 	return &reply, nil
 }
 func (*Server) AddChannel(context.Context, *ChannelRequest) (*ChannelReply, error) {
@@ -422,8 +403,8 @@ func (*Server) GetChannel(context.Context, *ChannelFetchRequest) (*ChannelFetchR
 	return nil, status.Errorf(codes.Unimplemented, "method GetChannel not implemented")
 }
 func (s *Server) CreateConference(ctx context.Context, req *ConferenceRequest) (*ConferenceReply, error) {
-	fmt.Println("creating conf!!!");
-	//var bridge *ari.BridgeHandle 
+	fmt.Println("creating conf!!!")
+	//var bridge *ari.BridgeHandle
 	var err error
 	headers, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -434,22 +415,22 @@ func (s *Server) CreateConference(ctx context.Context, req *ConferenceRequest) (
 	userId := headers["userid"][0]
 	domain := headers["domain"][0]
 	fmt.Println("client ID = " + clientId)
-	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
-	userIdInt, err := strconv.Atoi( userId )
+	workspaceName := utils.GetWorkspaceNameFromDomain(domain)
+	userIdInt, err := strconv.Atoi(userId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
-	workspace, err := strconv.Atoi( workspaceId )
+	workspace, err := strconv.Atoi(workspaceId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
 
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	resp, err := api.CreateConference( workspace, req.Name)
+	resp, err := api.CreateConference(workspace, req.Name)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
 	src := ari.NewKey(ari.ChannelKey, "123")
@@ -459,26 +440,24 @@ func (s *Server) CreateConference(ctx context.Context, req *ConferenceRequest) (
 		return nil, err
 	}
 
+	conf := types.NewConference(resp.Id, user, &types.LineBridge{Bridge: bridge})
 
-	conf := types.NewConference(resp.Id, user, &types.LineBridge{Bridge:bridge})
-
-
-	utils.AddConfBridge( s.Client, workspaceId, req.Name, conf )
+	utils.AddConfBridge(s.Client, workspaceId, req.Name, conf)
 
 	reply := ConferenceReply{
-		ConfId: conf.Id,
-		BridgeId: conf.Bridge.Bridge.ID() }
+		ConfId:   conf.Id,
+		BridgeId: conf.Bridge.Bridge.ID()}
 
 	s.dispatchEvent(func() {
 		// send to channel
 		data := make(map[string]string)
 		data["conf_id"] = resp.Id
-		evt:= ClientEvent{
+		evt := ClientEvent{
 			ClientId: clientId,
-			Type: "conference_ConfCreated",
-			Data: data }
-			fmt.Println("sending client event..")
-		s.safeSendToWS( clientId, &evt )
+			Type:     "conference_ConfCreated",
+			Data:     data}
+		fmt.Println("sending client event..")
+		s.safeSendToWS(clientId, &evt)
 	})
 	return &reply, nil
 }
@@ -486,24 +465,24 @@ func (*Server) ChannelGetBridge(context.Context, *ChannelGetBridgeRequest) (*Cha
 	return nil, status.Errorf(codes.Unimplemented, "method ChannelGetBridge not implemented")
 }
 func (s *Server) ChannelRemoveFromBridge(ctx context.Context, req *ChannelRemoveBridgeRequest) (*ChannelRemoveBridgeReply, error) {
-	fmt.Println("adding channel to bridge!!!");
+	fmt.Println("adding channel to bridge!!!")
 	headers, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, errors.New("could not get metadata")
 	}
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
-	bridge, err := s.lookupBridge( req.BridgeId )
+	bridge, err := s.lookupBridge(req.BridgeId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 
-	err = bridge.Bridge.RemoveChannel( channel.Channel.ID() )
+	err = bridge.Bridge.RemoveChannel(channel.Channel.ID())
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to remove channel from bridge")
 	}
@@ -519,7 +498,7 @@ func (s *Server) ChannelPlayTTS(ctx context.Context, req *ChannelTTSRequest) (*C
 
 	fmt.Println("client ID = " + clientId)
 	fmt.Println("lookup channel = " + req.ChannelId)
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
@@ -544,9 +523,9 @@ func (s *Server) ChannelPlayTTS(ctx context.Context, req *ChannelTTSRequest) (*C
 		return nil, err
 	}
 
-	go s.managePrompt( playback, clientId )
+	go s.managePrompt(playback, clientId)
 	reply := ChannelTTSReply{
-		PlaybackId: key.ID }
+		PlaybackId: key.ID}
 	return &reply, nil
 }
 func (*Server) ChannelStartAcceptingInput(context.Context, *ChannelInputRequest) (*ChannelInputReply, error) {
@@ -560,7 +539,7 @@ func (s *Server) ChannelRemoveDTMFListeners(ctx context.Context, req *ChannelRem
 	}
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
@@ -586,9 +565,9 @@ func (s *Server) ChannelStartFlow(ctx context.Context, req *ChannelStartFlowWidg
 	workspaceId := headers["workspaceid"][0]
 	userId := headers["userid"][0]
 	domain := headers["domain"][0]
-	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
+	workspaceName := utils.GetWorkspaceNameFromDomain(domain)
 	fmt.Println("client ID = " + clientId)
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
@@ -609,35 +588,35 @@ func (s *Server) ChannelStartFlow(ctx context.Context, req *ChannelStartFlowWidg
 		return nil, err
 	}
 	var macros []*types.WorkspaceMacro
-	err = json.Unmarshal( []byte(body), &macros)
+	err = json.Unmarshal([]byte(body), &macros)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
 
-	userIdInt, err := strconv.Atoi( userId )
+	userIdInt, err := strconv.Atoi(userId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
-	workspace, err := strconv.Atoi( workspaceId )
+	workspace, err := strconv.Atoi(workspaceId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
-	
+
 	user := types.NewUser(userIdInt, workspace, workspaceName)
 	flow := types.NewFlow(
-		flowData.FlowId,	
+		flowData.FlowId,
 		user,
 		info,
-		channel, 
+		channel,
 		macros,
 		s.Client)
 
-	vars := make( map[string] string )
+	vars := make(map[string]string)
 	flowCtx, _ := context.WithCancel(context.Background())
-	go mngrs.ProcessFlow( s.Client, flowCtx, flow, channel, vars, flow.Cells[ 0 ])
+	go mngrs.ProcessFlow(s.Client, flowCtx, flow, channel, vars, flow.Cells[0])
 	resp := ChannelStartFlowWidgetReply{}
 	return &resp, nil
 }
@@ -649,7 +628,7 @@ func (s *Server) ChannelStartRinging(ctx context.Context, req *GenericChannelReq
 	}
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
@@ -666,7 +645,7 @@ func (s *Server) ChannelStopRinging(ctx context.Context, req *GenericChannelReq)
 	}
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
@@ -683,7 +662,7 @@ func (s *Server) ChannelHangup(ctx context.Context, req *GenericChannelReq) (*Ge
 	}
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
@@ -702,25 +681,25 @@ func (s *Server) ChannelRecord(ctx context.Context, req *GenericChannelReq) (*Ge
 	userId := headers["userid"][0]
 	domain := headers["domain"][0]
 	fmt.Println("client ID = " + clientId)
-	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
-	userIdInt, err := strconv.Atoi( userId )
+	workspaceName := utils.GetWorkspaceNameFromDomain(domain)
+	userIdInt, err := strconv.Atoi(userId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
-	workspace, err := strconv.Atoi( workspaceId )
+	workspace, err := strconv.Atoi(workspaceId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
 
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording( user,nil,false )
-	id, err :=recording.InitiateRecordingForChannel(channel)
+	recording := helpers.NewRecording(user, nil, false)
+	id, err := recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
@@ -729,41 +708,41 @@ func (s *Server) ChannelRecord(ctx context.Context, req *GenericChannelReq) (*Ge
 		// send to channel
 		data := make(map[string]string)
 		data["recording_id"] = id
-		evt:= ClientEvent{
+		evt := ClientEvent{
 			ClientId: clientId,
-			Type: "recording_RecordingStarted",
-			Data: data }
-			fmt.Println("sending client event..")
-		s.safeSendToWS( clientId, &evt )
+			Type:     "recording_RecordingStarted",
+			Data:     data}
+		fmt.Println("sending client event..")
+		s.safeSendToWS(clientId, &evt)
 	})
 	resp := GenericChannelResp{}
 	return &resp, nil
 }
 func (s *Server) BridgeAddChannel(ctx context.Context, req *BridgeChannelRequest) (*BridgeChannelReply, error) {
-	fmt.Println("adding channel to bridge!!!");
+	fmt.Println("adding channel to bridge!!!")
 	headers, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, errors.New("could not get metadata")
 	}
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
-	bridge, err := s.lookupBridge( req.BridgeId )
+	bridge, err := s.lookupBridge(req.BridgeId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
-	fmt.Println("adding channel now!!!");
+	fmt.Println("adding channel now!!!")
 
-	s.addBridgeChannel( bridge, channel )
+	s.addBridgeChannel(bridge, channel)
 	reply := BridgeChannelReply{}
 	return &reply, nil
 }
 func (s *Server) BridgeAddChannels(ctx context.Context, req *BridgeChannelsRequest) (*BridgeChannelsReply, error) {
-	fmt.Println("adding channel to bridge!!!");
+	fmt.Println("adding channel to bridge!!!")
 	headers, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, errors.New("could not get metadata")
@@ -771,42 +750,41 @@ func (s *Server) BridgeAddChannels(ctx context.Context, req *BridgeChannelsReque
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
 
-
-	bridge, err := s.lookupBridge( req.BridgeId )
+	bridge, err := s.lookupBridge(req.BridgeId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 
 	for _, channelId := range req.ChannelId {
-		channel, err := s.lookupChannel( channelId )
+		channel, err := s.lookupChannel(channelId)
 		if err != nil {
 			return nil, eris.Wrap(err, "failed to add channel to bridge")
 		}
-		s.addBridgeChannel( bridge, channel )
+		s.addBridgeChannel(bridge, channel)
 	}
 	reply := BridgeChannelsReply{}
 	return &reply, nil
 }
 func (s *Server) BridgeRemoveChannel(ctx context.Context, req *BridgeChannelRequest) (*BridgeChannelReply, error) {
-	fmt.Println("remove bridge channel!!!");
+	fmt.Println("remove bridge channel!!!")
 	headers, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, errors.New("could not get metadata")
 	}
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
-	bridge, err := s.lookupBridge( req.BridgeId )
+	bridge, err := s.lookupBridge(req.BridgeId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 
-	channel, err := s.lookupChannel( req.ChannelId )
+	channel, err := s.lookupChannel(req.ChannelId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
-	fmt.Println("adding channel now!!!");
+	fmt.Println("adding channel now!!!")
 
-	s.removeBridgeChannel( bridge, channel )
+	s.removeBridgeChannel(bridge, channel)
 	reply := BridgeChannelReply{}
 	return &reply, nil
 }
@@ -831,24 +809,24 @@ func (s *Server) BridgeRecord(ctx context.Context, req *GenericBridgeReq) (*Gene
 	userId := headers["userid"][0]
 	domain := headers["domain"][0]
 	fmt.Println("client ID = " + clientId)
-	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
-	userIdInt, err := strconv.Atoi( userId )
+	workspaceName := utils.GetWorkspaceNameFromDomain(domain)
+	userIdInt, err := strconv.Atoi(userId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
-	workspace, err := strconv.Atoi( workspaceId )
+	workspace, err := strconv.Atoi(workspaceId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
-	bridge, err := s.lookupBridge( req.BridgeId )
+	bridge, err := s.lookupBridge(req.BridgeId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording( user,nil,false )
+	recording := helpers.NewRecording(user, nil, false)
 	id, err := recording.InitiateRecordingForBridge(bridge)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
@@ -858,12 +836,12 @@ func (s *Server) BridgeRecord(ctx context.Context, req *GenericBridgeReq) (*Gene
 		// send to channell
 		data := make(map[string]string)
 		data["recording_id"] = id
-		evt:= ClientEvent{
+		evt := ClientEvent{
 			ClientId: clientId,
-			Type: "recording_RecordingStarted",
-			Data: data }
-			fmt.Println("sending client event..")
-		s.safeSendToWS( clientId, &evt )
+			Type:     "recording_RecordingStarted",
+			Data:     data}
+		fmt.Println("sending client event..")
+		s.safeSendToWS(clientId, &evt)
 	})
 	resp := GenericBridgeResp{}
 	return &resp, nil
@@ -877,7 +855,7 @@ func (s *Server) BridgePlayTTS(ctx context.Context, req *BridgeTTSRequest) (*Bri
 
 	fmt.Println("client ID = " + clientId)
 	fmt.Println("lookup bridge  = " + req.BridgeId)
-	bridge, err := s.lookupBridge( req.BridgeId )
+	bridge, err := s.lookupBridge(req.BridgeId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
@@ -902,9 +880,9 @@ func (s *Server) BridgePlayTTS(ctx context.Context, req *BridgeTTSRequest) (*Bri
 		return nil, err
 	}
 
-	go s.managePrompt( playback, clientId )
+	go s.managePrompt(playback, clientId)
 	reply := BridgeTTSReply{
-		PlaybackId: key.ID }
+		PlaybackId: key.ID}
 	return &reply, nil
 }
 func (*Server) BridgeAutomateLegAHangup(context.Context, *BridgeAutomateLegRequest) (*BridgeAutomateLegReply, error) {
@@ -949,7 +927,7 @@ func (s *Server) BridgeDestroy(ctx context.Context, req *GenericBridgeReq) (*Gen
 	}
 	clientId := headers["clientid"][0]
 	fmt.Println("client ID = " + clientId)
-	bridge, err := s.lookupBridge( req.BridgeId )
+	bridge, err := s.lookupBridge(req.BridgeId)
 	if err != nil {
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
@@ -961,7 +939,7 @@ func (s *Server) BridgeDestroy(ctx context.Context, req *GenericBridgeReq) (*Gen
 		return nil, eris.Wrap(err, "failed to add channel to bridge")
 	}
 	for _, id := range data.ChannelIDs {
-		channel, err := s.lookupChannel( id )
+		channel, err := s.lookupChannel(id)
 		if err != nil {
 			//return nil, eris.Wrap(err, "failed to add channel to get channel")
 			continue
@@ -984,31 +962,31 @@ func (s *Server) RecordingStop(ctx context.Context, req *RecordingRequest) (*Rec
 	userId := headers["userid"][0]
 	domain := headers["domain"][0]
 	fmt.Println("client ID = " + clientId)
-	workspaceName := utils.GetWorkspaceNameFromDomain( domain )
-	userIdInt, err := strconv.Atoi( userId )
+	workspaceName := utils.GetWorkspaceNameFromDomain(domain)
+	userIdInt, err := strconv.Atoi(userId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
-	workspace, err := strconv.Atoi( workspaceId )
+	workspace, err := strconv.Atoi(workspaceId)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
 		return nil, err
 	}
 
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording( user,nil,false )
+	recording := helpers.NewRecording(user, nil, false)
 	go recording.Stop()
 	s.dispatchEvent(func() {
 		// send to channel
 		data := make(map[string]string)
 		data["recording_id"] = recording.Handle.ID()
-		evt:= ClientEvent{
+		evt := ClientEvent{
 			ClientId: clientId,
-			Type: "recording_RecordingStopped",
-			Data: data }
-			fmt.Println("sending client event..")
-		s.safeSendToWS( clientId, &evt )
+			Type:     "recording_RecordingStopped",
+			Data:     data}
+		fmt.Println("sending client event..")
+		s.safeSendToWS(clientId, &evt)
 	})
 	return &RecordingReply{}, nil
 }

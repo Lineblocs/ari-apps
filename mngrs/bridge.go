@@ -2,13 +2,12 @@ package mngrs
 
 import (
 	//"context"
-	"context"
+
 	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/CyCoreSystems/ari/v5/rid"
@@ -82,7 +81,7 @@ func (man *BridgeManager) addAllRequestedCalls(bridge *types.LineBridge) {
 			key := ari.NewKey(ari.ChannelKey, call.ChannelId)
 			channel := ctx.Client.Channel().Get(key)
 			reqChannel := types.LineChannel{Channel: channel}
-			utils.AddChannelToBridge(bridge, &reqChannel)
+			bridge.AddChannel(&reqChannel)
 		}
 	}
 }
@@ -138,7 +137,7 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 			}
 			v := e.(*ari.ChannelLeftBridge)
 			utils.Log(logrus.DebugLevel, "channel left bridge, channel:"+v.Channel.Name)
-			man.endBridgeCall(bridge)
+			bridge.EndBridgeCall()
 			record.Stop()
 
 			resp := types.ManagerResponse{
@@ -149,16 +148,6 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	}
 }
 
-func (man *BridgeManager) endBridgeCall(lineBridge *types.LineBridge) {
-	utils.Log(logrus.DebugLevel, "ending ALL bridge calls..")
-	for _, item := range lineBridge.Channels {
-		utils.Log(logrus.DebugLevel, "ending call: "+item.Channel.Key().ID)
-		utils.SafeHangup(item)
-	}
-
-	// TODO:  billing
-
-}
 func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) {
 	ctx := man.ManagerContext
 	lineChannel := ctx.Channel
@@ -280,7 +269,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
-	outCall, err := utils.CreateCall(resp.Headers.Get("x-call-id"), &outChannel, &params)
+	outCall, err := outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
 		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
@@ -302,39 +291,16 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 
 	wg1 := new(sync.WaitGroup)
 	wg1.Add(1)
-	utils.AddChannelToBridge(bridge, channel)
-	utils.AddChannelToBridge(bridge, &outChannel)
+	bridge.AddChannel(channel)
+	bridge.AddChannel(&outChannel)
 	go man.manageOutboundCallLeg(&outChannel, bridge, wg1, stopChannel)
 
 	wg1.Wait()
 
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
-	go man.startListeningForRingTimeout(timeout, bridge, wg2, stopChannel)
+	go bridge.StartWaitingForRingTimeout(timeout, wg2, stopChannel)
 	wg2.Wait()
-}
-
-func (man *BridgeManager) startListeningForRingTimeout(timeout int, bridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan <-chan bool) {
-	utils.Log(logrus.DebugLevel, "starting ring timeout checker..")
-	utils.Log(logrus.DebugLevel, "timeout set for: "+strconv.Itoa(timeout))
-	duration := time.Now().Add(time.Duration(timeout) * time.Second)
-
-	// Create a context that is both manually cancellable and will signal
-	// a cancel at the specified duration.
-	ringCtx, cancel := context.WithDeadline(context.Background(), duration)
-	defer cancel()
-	wg.Done()
-	for {
-		select {
-		case <-ringTimeoutChan:
-			utils.Log(logrus.DebugLevel, "bridge in session. stopping ring timeout")
-			return
-		case <-ringCtx.Done():
-			utils.Log(logrus.DebugLevel, "Ring timeout elapsed.. ending all calls")
-			man.endBridgeCall(bridge)
-			return
-		}
-	}
 }
 
 func NewBridgeManager(mngrCtx *types.Context, flow *types.Flow) *BridgeManager {
