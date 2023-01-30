@@ -192,7 +192,3 @@ func TestCreateCall(t *testing.T) {
 		})
 	}
 }
-
-func TestStartWaitingForRingTimeout(t *testing.T) {
-
-}
