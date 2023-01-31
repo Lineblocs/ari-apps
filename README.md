@@ -20,7 +20,6 @@ git clone https://github.com/Lineblocs/ari-apps.git
 
 ## Structure of Code
 
-internals-api uses echo framework which is high performance, extensible, minimalist Go framework.
 1. api
    includes api functions which are connected to internals-api
 2. grpc
@@ -31,6 +30,15 @@ internals-api uses echo framework which is high performance, extensible, minimal
    includes basic model types files
 5. utils
    includes common utils functions
+
+## Testing
+
+### Unit test with builtin Testing package
+
+```bash
+cd types
+go test -v
+```
 
 ## Debugging
 
@@ -68,5 +76,5 @@ Config .pre-commit-config.yaml file to enable or disable pre-commit hook
 ### Deploy Command
 
 ```bash
-docker build -t internals-api
+docker build -t aria-apps
 ```
