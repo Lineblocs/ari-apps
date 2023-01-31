@@ -2,11 +2,10 @@ package mngrs
 
 import (
 	//"context"
-	"context"
+
 	"encoding/json"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/sirupsen/logrus"
@@ -71,36 +70,6 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 			utils.Log(logrus.DebugLevel, "root inded call..")
 			return
 
-		}
-	}
-}
-func (man *DialManager) startListeningForRingTimeout(timeout int, outboundChannel *types.LineChannel, wg *sync.WaitGroup, ringTimeoutChan <-chan bool) {
-	ctx := man.ManagerContext
-
-	cell := ctx.Cell
-	utils.Log(logrus.DebugLevel, "starting ring timeout checker..")
-	utils.Log(logrus.DebugLevel, "timeout set for: "+strconv.Itoa(timeout))
-	noAnswer, _ := utils.FindLinkByName(cell.SourceLinks, "source", "No Answer")
-
-	duration := time.Now().Add(time.Duration(timeout) * time.Second)
-
-	// Create a context that is both manually cancellable and will signal
-	// a cancel at the specified duration.
-	ringCtx, cancel := context.WithDeadline(context.Background(), duration)
-	defer cancel()
-	wg.Done()
-	for {
-		select {
-		case <-ringTimeoutChan:
-			utils.Log(logrus.DebugLevel, "bridge in session. stopping ring timeout")
-			return
-		case <-ringCtx.Done():
-			utils.Log(logrus.DebugLevel, "Ring timeout elapsed.. ending all calls")
-			resp := types.ManagerResponse{
-				Channel: outboundChannel,
-				Link:    noAnswer}
-			man.ManagerContext.RecvChannel <- &resp
-			return
 		}
 	}
 }
@@ -173,7 +142,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	utils.Log(logrus.InfoLevel, "creating outbound call...")
 	resp, err := api.SendHttpRequest("/call/createCall", body)
-	outCall, err := utils.CreateCall(resp.Headers.Get("x-call-id"), &outChannel, &params)
+	outCall, err := outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
 		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
@@ -198,7 +167,8 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
-	go man.startListeningForRingTimeout(timeout, &outChannel, wg2, stopChannel)
+	noAnswer, _ := utils.FindLinkByName(cell.SourceLinks, "source", "No Answer")
+	go outChannel.StartWaitingForRingTimeout(ctx, noAnswer, timeout, wg2, stopChannel, "dial")
 	wg2.Wait()
 }
 

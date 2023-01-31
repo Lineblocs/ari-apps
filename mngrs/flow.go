@@ -80,7 +80,7 @@ func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, l
 
 			if resp.Link == nil {
 				utils.Log(logrus.DebugLevel, "no target found... hanging up")
-				utils.SafeHangup(resp.Channel)
+				resp.Channel.SafeHangup()
 				return
 			}
 			next := resp.Link
