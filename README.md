@@ -76,5 +76,5 @@ Config .pre-commit-config.yaml file to enable or disable pre-commit hook
 ### Deploy Command
 
 ```bash
-docker build -t aria-apps
+docker build -t ari-apps
 ```
