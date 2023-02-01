@@ -1,11 +1,6 @@
-[![Alt text](https://github.com/Lineblocs/ari-apps/actions/workflows/ci.yml/badge.svg)](https://github.com/Lineblocs/ari-apps/actions/workflows/ci.yml/badge.svg)
-```
+# Lineblocs ARI services
 
-export GOPATH=$HOME/go
-export PATH=$PATH:$GOPATH/bin
-protoc --go_out=plugins=grpc:. *.proto
-protoc --go-grpc_out=grpc lineblocs.proto
-```
+[![Alt text](https://github.com/Lineblocs/ari-apps/actions/workflows/ci.yml/badge.svg)](https://github.com/Lineblocs/ari-apps/actions/workflows/ci.yml/badge.svg)
 
 ## Prerequisites
 
@@ -30,6 +25,20 @@ git clone https://github.com/Lineblocs/ari-apps.git
    includes basic model types files
 5. utils
    includes common utils functions
+   
+# Compiling protobuf files for gRPC
+
+This project uses gRPC for server side API and includes files that use protobuf. 
+
+To compile the protobuf files please use the following commands:
+
+```
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+protoc --go_out=plugins=grpc:. *.proto
+protoc --go-grpc_out=grpc lineblocs.proto
+```
+
 
 ## Testing
 
