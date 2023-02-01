@@ -26,7 +26,7 @@ git clone https://github.com/Lineblocs/ari-apps.git
 5. utils
    includes common utils functions
    
-# Compiling protobuf files for gRPC
+## Compiling protobuf files for gRPC
 
 This project uses gRPC for server side API and includes files that use protobuf. 
 
