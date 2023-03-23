@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	helpers "github.com/Lineblocs/go-helpers"
 	_ "github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 
@@ -39,7 +40,7 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
 	host := os.Getenv("ARI_HOST")
 	ariUrl := fmt.Sprintf("http://%s:8088/ari", host)
 	wsUrl := fmt.Sprintf("ws://%s:8088/ari/events", host)
-	utils.Log(logrus.InfoLevel, "Connecting to: "+ariUrl)
+	helpers.Log(logrus.InfoLevel, "Connecting to: "+ariUrl)
 	proxy := os.Getenv("ARI_USE_PROXY")
 	if proxy != "" {
 		useProxy, err = strconv.ParseBool(proxy)
@@ -49,14 +50,14 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
 	}
 	ctx := context.Background()
 	if useProxy {
-		utils.Log(logrus.DebugLevel, "Using ARI proxy!!!")
+		helpers.Log(logrus.DebugLevel, "Using ARI proxy!!!")
 		natsgw := os.Getenv("NATSGW_URL")
 		cl, err := client.New(ctx,
 			client.WithApplication(ariApp),
 			client.WithURI(natsgw))
 		return cl, err
 	}
-	utils.Log(logrus.InfoLevel, "Directly connecting to ARI server\r\n")
+	helpers.Log(logrus.InfoLevel, "Directly connecting to ARI server\r\n")
 	cl, err = native.Connect(&native.Options{
 		Application:  ariApp,
 		Username:     os.Getenv("ARI_USERNAME"),
@@ -69,14 +70,17 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
 func main() {
 	// OPTIONAL: setup logging
 	//native.Logger = log
-	utils.InitLogrus()
-	utils.Log(logrus.InfoLevel, "Connecting")
+	// Init Logrus and configure channels
+	logDestination := utils.Config("LOG_DESTINATIONS")
+	helpers.InitLogrus(logDestination)
+
+	helpers.Log(logrus.InfoLevel, "Connecting")
 	ctx, cancel := context.WithCancel(context.Background())
 	connectCtx, cancel2 := context.WithCancel(context.Background())
 	defer cancel()
 	defer cancel2()
 	cl, err := createARIConnection(connectCtx)
-	utils.Log(logrus.InfoLevel, "Connected to ARI")
+	helpers.Log(logrus.InfoLevel, "Connected to ARI")
 
 	if err != nil {
 		panic(err.Error())
@@ -85,20 +89,20 @@ func main() {
 
 	defer cl.Close()
 
-	utils.Log(logrus.InfoLevel, "starting GRPC listener...")
+	helpers.Log(logrus.InfoLevel, "starting GRPC listener...")
 	go grpc.StartListener(cl)
 	// setup app
 
-	utils.Log(logrus.InfoLevel, "Starting listener app")
+	helpers.Log(logrus.InfoLevel, "Starting listener app")
 
-	utils.Log(logrus.InfoLevel, "Listening for new calls")
+	helpers.Log(logrus.InfoLevel, "Listening for new calls")
 	sub := cl.Bus().Subscribe(nil, "StasisStart")
 
 	for {
 		select {
 		case e := <-sub.Events():
 			v := e.(*ari.StasisStart)
-			utils.Log(logrus.InfoLevel, "Got stasis start"+" channel "+v.Channel.ID)
+			helpers.Log(logrus.InfoLevel, "Got stasis start"+" channel "+v.Channel.ID)
 			go startExecution(cl, v, ctx, cl.Channel().Get(v.Key(ari.ChannelKey, v.Channel.ID)))
 		case <-ctx.Done():
 			return
@@ -132,7 +136,7 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 		case <-ctx.Done():
 			return
 		case <-endSub.Events():
-			utils.Log(logrus.DebugLevel, "stasis end called..")
+			helpers.Log(logrus.DebugLevel, "stasis end called..")
 			call.Ended = time.Now()
 			params := types.StatusParams{
 				CallId: call.CallId,
@@ -140,24 +144,24 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 				Status: "ended"}
 			body, err := json.Marshal(params)
 			if err != nil {
-				utils.Log(logrus.DebugLevel, "JSON error: "+err.Error())
+				helpers.Log(logrus.DebugLevel, "JSON error: "+err.Error())
 				continue
 			}
 
 			_, err = api.SendHttpRequest("/call/updateCall", body)
 			if err != nil {
-				utils.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
+				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
 				continue
 			}
 			err = createCallDebit(flow.User, call, "incoming")
 			if err != nil {
-				utils.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
+				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
 				continue
 			}
 
 		case call = <-callChannel:
-			utils.Log(logrus.DebugLevel, "call is setup")
-			utils.Log(logrus.DebugLevel, "id is "+strconv.Itoa(call.CallId))
+			helpers.Log(logrus.DebugLevel, "call is setup")
+			helpers.Log(logrus.DebugLevel, "id is "+strconv.Itoa(call.CallId))
 		}
 	}
 }
@@ -171,7 +175,7 @@ func attachDTMFListeners(channel *types.LineChannel, ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-dtmfSub.Events():
-			utils.Log(logrus.DebugLevel, "received DTMF!")
+			helpers.Log(logrus.DebugLevel, "received DTMF!")
 		}
 	}
 }
@@ -181,9 +185,9 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 	callChannel := make(chan *types.Call)
 	go attachChannelLifeCycleListeners(flow, lineChannel, ctx, callChannel)
 
-	utils.Log(logrus.DebugLevel, "calling API to create call...")
-	utils.Log(logrus.DebugLevel, "exten is: "+exten)
-	utils.Log(logrus.DebugLevel, "caller ID is: "+callerId)
+	helpers.Log(logrus.DebugLevel, "calling API to create call...")
+	helpers.Log(logrus.DebugLevel, "exten is: "+exten)
+	helpers.Log(logrus.DebugLevel, "caller ID is: "+callerId)
 	params := types.CallParams{
 		From:        callerId,
 		To:          exten,
@@ -194,19 +198,19 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 		ChannelId:   lineChannel.Channel.ID()}
 	body, err := json.Marshal(params)
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 
-	utils.Log(logrus.InfoLevel, "creating call...")
+	helpers.Log(logrus.InfoLevel, "creating call...")
 	resp, err := api.SendHttpRequest("/call/createCall", body)
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 
 	id := resp.Headers.Get("x-call-id")
-	utils.Log(logrus.DebugLevel, "Call ID is: "+id)
+	helpers.Log(logrus.DebugLevel, "Call ID is: "+id)
 	idAsInt, err := strconv.Atoi(id)
 
 	call := types.Call{
@@ -216,7 +220,7 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 		Params:  &params}
 
 	flow.RootCall = &call
-	utils.Log(logrus.DebugLevel, "answering call..")
+	helpers.Log(logrus.DebugLevel, "answering call..")
 	lineChannel.Answer()
 	vars := make(map[string]string)
 	go mngrs.ProcessFlow(cl, ctx, flow, lineChannel, vars, flow.Cells[0])
@@ -230,15 +234,15 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 }
 
 func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, h *ari.ChannelHandle) {
-	utils.Log(logrus.InfoLevel, "running app"+" channel "+h.Key().ID)
+	helpers.Log(logrus.InfoLevel, "running app"+" channel "+h.Key().ID)
 
 	action := event.Args[0]
 	exten := event.Args[1]
 	vals := make(map[string]string)
 	vals["number"] = exten
 
-	utils.Log(logrus.DebugLevel, "received action: "+action)
-	utils.Log(logrus.DebugLevel, "EXTEN: "+exten)
+	helpers.Log(logrus.DebugLevel, "received action: "+action)
+	helpers.Log(logrus.DebugLevel, "EXTEN: "+exten)
 
 	switch action {
 	case "h":
@@ -259,18 +263,18 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		lineChannel.Answer()
 
 		resp, err := api.GetUserByDID(exten)
-		utils.Log(logrus.DebugLevel, "exten ="+exten)
-		utils.Log(logrus.DebugLevel, "caller ID ="+callerId)
-		utils.Log(logrus.DebugLevel, "trunk addr ="+trunkAddr)
+		helpers.Log(logrus.DebugLevel, "exten ="+exten)
+		helpers.Log(logrus.DebugLevel, "caller ID ="+callerId)
+		helpers.Log(logrus.DebugLevel, "trunk addr ="+trunkAddr)
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not get domain. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not get domain. error: "+err.Error())
 			return
 		}
-		utils.Log(logrus.DebugLevel, "workspace ID= "+strconv.Itoa(resp.WorkspaceId))
+		helpers.Log(logrus.DebugLevel, "workspace ID= "+strconv.Itoa(resp.WorkspaceId))
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 		err = utils.ProcessSIPTrunkCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, trunkAddr)
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
 
 		}
@@ -279,7 +283,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		body, err := api.SendGetRequest("/user/getDIDNumberData", vals)
 
 		if err != nil {
-			utils.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
+			helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
 			return
 		}
 
@@ -287,32 +291,32 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		var flowJson types.FlowVars
 		err = json.Unmarshal([]byte(body), &data)
 		if err != nil {
-			utils.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
+			helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
 			return
 		}
 
 		if utils.CheckFreeTrial(data.Plan) {
-			utils.Log(logrus.ErrorLevel, "Ending call due to free trial")
+			helpers.Log(logrus.ErrorLevel, "Ending call due to free trial")
 			h.Hangup()
-			utils.Log(logrus.DebugLevel, fmt.Sprintf("msg = %s", logger.FREE_TRIAL_ENDED))
+			helpers.Log(logrus.DebugLevel, fmt.Sprintf("msg = %s", logger.FREE_TRIAL_ENDED))
 			return
 		}
 		err = json.Unmarshal([]byte(data.FlowJson), &flowJson)
 		if err != nil {
-			utils.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
+			helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
 			return
 		}
 
 		body, err = api.SendGetRequest("/user/getWorkspaceMacros", vals)
 
 		if err != nil {
-			utils.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
+			helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
 			return
 		}
 		var macros []*types.WorkspaceMacro
 		err = json.Unmarshal([]byte(body), &macros)
 		if err != nil {
-			utils.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
+			helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
 			return
 		}
 
@@ -327,7 +331,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 			macros,
 			cl)
 
-		utils.Log(logrus.DebugLevel, "processing action: "+action)
+		helpers.Log(logrus.DebugLevel, "processing action: "+action)
 
 		callerId := event.Args[2]
 		fmt.Printf("Starting stasis with extension: %s, caller id: %s", exten, callerId)
@@ -340,14 +344,14 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		lineChannel := types.LineChannel{
 			Channel: h}
 
-		utils.Log(logrus.DebugLevel, "looking up domain: "+domain)
+		helpers.Log(logrus.DebugLevel, "looking up domain: "+domain)
 		resp, err := api.GetUserByDomain(domain)
 
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not get domain. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not get domain. error: "+err.Error())
 			return
 		}
-		utils.Log(logrus.DebugLevel, "workspace ID= "+strconv.Itoa(resp.WorkspaceId))
+		helpers.Log(logrus.DebugLevel, "workspace ID= "+strconv.Itoa(resp.WorkspaceId))
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
@@ -355,7 +359,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		lineChannel.Answer()
 		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension", nil)
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
 
 		}
@@ -364,17 +368,17 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		callerId := event.Args[2]
 		domain := event.Args[3]
 
-		utils.Log(logrus.DebugLevel, "channel key: "+h.Key().ID)
+		helpers.Log(logrus.DebugLevel, "channel key: "+h.Key().ID)
 
 		lineChannel := types.LineChannel{
 			Channel: h}
 		resp, err := api.GetUserByDomain(domain)
 
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not get domain. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not get domain. error: "+err.Error())
 			return
 		}
-		utils.Log(logrus.DebugLevel, "workspace ID= "+strconv.Itoa(resp.WorkspaceId))
+		helpers.Log(logrus.DebugLevel, "workspace ID= "+strconv.Itoa(resp.WorkspaceId))
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
@@ -382,34 +386,34 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		callerInfo, err := api.GetCallerId(user.Workspace.Domain, callerId)
 
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not get caller id. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not get caller id. error: "+err.Error())
 			return
 		}
 		fmt.Printf("setup caller id: " + callerInfo.CallerId)
 		lineChannel.Answer()
 		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn", nil)
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
 
 		}
 
 	case "OUTGOING_PROXY_MEDIA":
-		utils.Log(logrus.InfoLevel, "media service call..")
+		helpers.Log(logrus.InfoLevel, "media service call..")
 	case "OUTGOING_TRUNK_CALL":
 		callerId := event.Args[2]
 		trunkSourceIp := event.Args[3]
-		utils.Log(logrus.DebugLevel, "channel key: "+h.Key().ID)
+		helpers.Log(logrus.DebugLevel, "channel key: "+h.Key().ID)
 
 		lineChannel := types.LineChannel{
 			Channel: h}
 		resp, err := api.GetUserByTrunkSourceIp(trunkSourceIp)
 
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not get domain. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not get domain. error: "+err.Error())
 			return
 		}
-		utils.Log(logrus.DebugLevel, "workspace ID= "+strconv.Itoa(resp.WorkspaceId))
+		helpers.Log(logrus.DebugLevel, "workspace ID= "+strconv.Itoa(resp.WorkspaceId))
 		user := types.NewUser(resp.Id, resp.WorkspaceId, resp.WorkspaceName)
 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, resp.WorkspaceName)
@@ -419,12 +423,12 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		headers = append(headers, "X-Lineblocs-User-SIP-Trunk-Calling-PSTN: true")
 		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn", &headers)
 		if err != nil {
-			utils.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
+			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
 
 		}
 
 	default:
-		utils.Log(logrus.InfoLevel, "unknown call type...")
+		helpers.Log(logrus.InfoLevel, "unknown call type...")
 	}
 }

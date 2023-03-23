@@ -5,6 +5,7 @@ import (
 	"strings"
 	//"github.com/CyCoreSystems/ari/v5"
 
+	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
@@ -41,20 +42,20 @@ func (man *SwitchManager) startTestForCondition() {
 	if strings.HasPrefix(test, "{{") && strings.HasSuffix(test, "}}") {
 		result = before
 	} else {
-		utils.Log(logrus.DebugLevel, "test variable: "+test)
+		helpers.Log(logrus.DebugLevel, "test variable: "+test)
 		splitted := strings.Split(test, ".")
 		if len(splitted) > 1 {
 			name := splitted[0]
 			variable := strings.Join(splitted[1:len(splitted)], ".")
-			utils.Log(logrus.DebugLevel, "looking UP: "+variable)
+			helpers.Log(logrus.DebugLevel, "looking UP: "+variable)
 			value, err := utils.LookupCellVariable(flow, name, variable)
 			if err != nil {
-				utils.Log(logrus.DebugLevel, "cell lookup error: "+err.Error())
+				helpers.Log(logrus.DebugLevel, "cell lookup error: "+err.Error())
 			}
 			result = value
 		}
 	}
-	utils.Log(logrus.DebugLevel, "result is: "+result)
+	helpers.Log(logrus.DebugLevel, "result is: "+result)
 
 	var matched *types.ModelLink
 	for _, link := range links {
@@ -62,9 +63,9 @@ func (man *SwitchManager) startTestForCondition() {
 		condType := link.Type
 		value := link.Value
 
-		utils.Log(logrus.DebugLevel, "Cond type: "+condType)
-		utils.Log(logrus.DebugLevel, "Cond: "+cond)
-		utils.Log(logrus.DebugLevel, "Value: "+value)
+		helpers.Log(logrus.DebugLevel, "Cond type: "+condType)
+		helpers.Log(logrus.DebugLevel, "Cond: "+cond)
+		helpers.Log(logrus.DebugLevel, "Value: "+value)
 		if condType == "LINK_CONDITION_MATCHES" {
 			if cond == "Equals" && result == value {
 				// matched
@@ -85,10 +86,10 @@ func (man *SwitchManager) startTestForCondition() {
 	if matched != nil {
 
 		for _, item := range sourceLinks {
-			utils.Log(logrus.DebugLevel, "comparing 1: "+matched.Cell)
-			utils.Log(logrus.DebugLevel, "comparing 2: "+item.Target.Model.Name)
+			helpers.Log(logrus.DebugLevel, "comparing 1: "+matched.Cell)
+			helpers.Log(logrus.DebugLevel, "comparing 2: "+item.Target.Model.Name)
 			if item.Target.Model.Name == matched.Cell {
-				utils.Log(logrus.DebugLevel, "found match - going to result..")
+				helpers.Log(logrus.DebugLevel, "found match - going to result..")
 				resp := types.ManagerResponse{
 					Channel: channel,
 					Link:    item}

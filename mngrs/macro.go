@@ -13,6 +13,7 @@ import (
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 
+	helpers "github.com/Lineblocs/go-helpers"
 	"google.golang.org/grpc"
 	"lineblocs.com/processor/router"
 )
@@ -32,7 +33,7 @@ func (man *MacroManager) startGRPCAndRunMacro(macro *types.WorkspaceMacro, param
 	svcUri := fmt.Sprintf("%s.%s.svc.cluster.local:%s", user.WorkspaceName, name, port)
 	conn, err := grpc.Dial(svcUri, grpc.WithInsecure())
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "did not connect: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "did not connect: "+err.Error())
 		return err
 	}
 	defer conn.Close()
@@ -47,14 +48,14 @@ func (man *MacroManager) startGRPCAndRunMacro(macro *types.WorkspaceMacro, param
 		Event: params}
 	response, err := c.CallMacro(context.Background(), &eventCtx)
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "Error when calling CallMacro: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "Error when calling CallMacro: "+err.Error())
 		return err
 	}
 	if response.Error {
-		utils.Log(logrus.InfoLevel, "macro resulted in error: "+response.Msg)
+		helpers.Log(logrus.InfoLevel, "macro resulted in error: "+response.Msg)
 		return errors.New(response.Msg)
 	}
-	utils.Log(logrus.InfoLevel, "Response from server: "+response.Result)
+	helpers.Log(logrus.InfoLevel, "Response from server: "+response.Result)
 	return nil
 }
 
@@ -76,7 +77,7 @@ func (man *MacroManager) executeMacro() {
 	channel := man.ManagerContext.Channel
 	flow := man.ManagerContext.Flow
 	model := cell.Model
-	utils.Log(logrus.DebugLevel, "running macro script..")
+	helpers.Log(logrus.DebugLevel, "running macro script..")
 
 	function := model.Data["function"].(types.ModelDataStr).Value
 	params := model.Data["params"].(types.ModelDataObj).Value
@@ -94,7 +95,7 @@ func (man *MacroManager) executeMacro() {
 	}
 
 	if foundFn == nil {
-		utils.Log(logrus.DebugLevel, "could not find macro function...")
+		helpers.Log(logrus.DebugLevel, "could not find macro function...")
 		resp := types.ManagerResponse{
 			Channel: channel,
 			Link:    errorLink}
@@ -107,7 +108,7 @@ func (man *MacroManager) executeMacro() {
 	//err := man.initializeK8sAndExecute(sEnc)
 
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		resp := types.ManagerResponse{
 			Channel: channel,
 			Link:    errorLink}
