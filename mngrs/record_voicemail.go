@@ -6,10 +6,10 @@ import (
 
 	"fmt"
 
+	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
-	"lineblocs.com/processor/helpers"
+	processor_helpers "lineblocs.com/processor/helpers"
 	"lineblocs.com/processor/types"
-	"lineblocs.com/processor/utils"
 )
 
 type RecordVoicemailManager struct {
@@ -25,7 +25,7 @@ func NewRecordVoicemailManager(mngrCtx *types.Context, flow *types.Flow) *Record
 	return &item
 }
 func (man *RecordVoicemailManager) StartProcessing() {
-	utils.Log(logrus.DebugLevel, "Creating bridge... ")
+	helpers.Log(logrus.DebugLevel, "Creating bridge... ")
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	channel := cell.CellChannel
@@ -37,7 +37,7 @@ func (man *RecordVoicemailManager) StartProcessing() {
 	if ok {
 		trim = trimData.Value
 	}
-	recording := helpers.NewRecording(user, nil, trim)
+	recording := processor_helpers.NewRecording(user, nil, trim)
 	_, err := recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("recording err " + err.Error())

@@ -14,9 +14,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	//"github.com/CyCoreSystems/ari/v5/ext/play"
+	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/rotisserie/eris"
 	"lineblocs.com/processor/api"
-	"lineblocs.com/processor/helpers"
+	processor_helpers "lineblocs.com/processor/helpers"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
@@ -28,7 +29,7 @@ type BridgeManager struct {
 
 func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) error {
 	ctx := man.ManagerContext
-	utils.Log(logrus.DebugLevel, "ensureBridge called..")
+	helpers.Log(logrus.DebugLevel, "ensureBridge called..")
 	var bridge *ari.BridgeHandle
 	var err error
 
@@ -40,18 +41,18 @@ func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) error {
 	}
 
 	lineBridge := types.NewBridge(bridge)
-	utils.Log(logrus.InfoLevel, "channel added to bridge")
+	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go man.manageBridge(lineBridge, wg, callType)
 	wg.Wait()
 	if err := bridge.AddChannel(ctx.Channel.Channel.Key().ID); err != nil {
-		utils.Log(logrus.ErrorLevel, "failed to add channel to bridge, error:"+err.Error())
+		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge, error:"+err.Error())
 		return errors.New("failed to add channel to bridge")
 	}
 
-	utils.Log(logrus.InfoLevel, "channel added to bridge")
+	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 	man.addAllRequestedCalls(lineBridge)
 	go man.startOutboundCall(lineBridge, callType)
 
@@ -67,14 +68,14 @@ func (man *BridgeManager) addAllRequestedCalls(bridge *types.LineBridge) {
 		return
 	}
 	callIds := extras.(types.ModelDataStr)
-	utils.Log(logrus.DebugLevel, "looking up requested channels")
+	helpers.Log(logrus.DebugLevel, "looking up requested channels")
 	if callIds.Value != "" {
 		ids := strings.Split(callIds.Value, ",")
 		for _, id := range ids {
-			utils.Log(logrus.DebugLevel, "adding requested channel: "+id)
+			helpers.Log(logrus.DebugLevel, "adding requested channel: "+id)
 			call, err := api.FetchCall(id)
 			if err != nil {
-				utils.Log(logrus.DebugLevel, "error fetching requested channel: "+err.Error())
+				helpers.Log(logrus.DebugLevel, "error fetching requested channel: "+err.Error())
 				continue
 			}
 
@@ -91,17 +92,17 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	flow := ctx.Flow
 	cell := ctx.Cell
 	channel := ctx.Channel
-	record := helpers.NewRecording(flow.User, &flow.RootCall.CallId, false)
+	record := processor_helpers.NewRecording(flow.User, &flow.RootCall.CallId, false)
 	//_,recordErr:=record.InitiateRecordingForBridge(bridge)
 	_, recordErr := record.InitiateRecordingForBridge(bridge)
 	next, _ := utils.FindLinkByName(cell.TargetLinks, "source", "Connected Call Ended")
 
 	if recordErr != nil {
-		utils.Log(logrus.ErrorLevel, "error starting recording: "+recordErr.Error())
+		helpers.Log(logrus.ErrorLevel, "error starting recording: "+recordErr.Error())
 		return
 	}
 
-	utils.Log(logrus.DebugLevel, "manageBridge called..")
+	helpers.Log(logrus.DebugLevel, "manageBridge called..")
 	// Delete the bridge when we exit
 	defer h.Delete()
 
@@ -115,28 +116,28 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	defer leaveSub.Cancel()
 
 	wg.Done()
-	utils.Log(logrus.DebugLevel, "listening for bridge events...")
+	helpers.Log(logrus.DebugLevel, "listening for bridge events...")
 	for {
 		select {
 		case <-ctx.Context.Done():
 			return
 		case <-destroySub.Events():
-			utils.Log(logrus.DebugLevel, "bridge destroyed")
+			helpers.Log(logrus.DebugLevel, "bridge destroyed")
 			return
 		case e, ok := <-enterSub.Events():
 			if !ok {
-				utils.Log(logrus.ErrorLevel, "channel entered subscription closed")
+				helpers.Log(logrus.ErrorLevel, "channel entered subscription closed")
 				return
 			}
 			v := e.(*ari.ChannelEnteredBridge)
-			utils.Log(logrus.DebugLevel, "channel entered bridge, channel:"+v.Channel.Name)
+			helpers.Log(logrus.DebugLevel, "channel entered bridge, channel:"+v.Channel.Name)
 		case e, ok := <-leaveSub.Events():
 			if !ok {
-				utils.Log(logrus.ErrorLevel, "channel left subscription closed")
+				helpers.Log(logrus.ErrorLevel, "channel left subscription closed")
 				return
 			}
 			v := e.(*ari.ChannelLeftBridge)
-			utils.Log(logrus.DebugLevel, "channel left bridge, channel:"+v.Channel.Name)
+			helpers.Log(logrus.DebugLevel, "channel left bridge, channel:"+v.Channel.Name)
 			bridge.EndBridgeCall()
 			record.Stop()
 
@@ -155,7 +156,7 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 
 	next, err := utils.FindLinkByName(cell.TargetLinks, "source", "Caller Hung Up")
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "error finding link.. ")
+		helpers.Log(logrus.DebugLevel, "error finding link.. ")
 	}
 
 	endSub := outboundChannel.Channel.Subscribe(ari.Events.StasisEnd)
@@ -167,28 +168,28 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 	defer rootEndSub.Cancel()
 
 	wg.Done()
-	utils.Log(logrus.DebugLevel, "listening for channel events...")
+	helpers.Log(logrus.DebugLevel, "listening for channel events...")
 
 	for {
 
 		select {
 		case <-startSub.Events():
-			utils.Log(logrus.DebugLevel, "started call..")
+			helpers.Log(logrus.DebugLevel, "started call..")
 
 			if err := lineBridge.Bridge.AddChannel(outboundChannel.Channel.Key().ID); err != nil {
-				utils.Log(logrus.ErrorLevel, "failed to add channel to bridge, error:"+err.Error())
+				helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge, error:"+err.Error())
 				return
 			}
-			utils.Log(logrus.DebugLevel, "added outbound channel to bridge..")
-			utils.Log(logrus.DebugLevel, "exiting...")
+			helpers.Log(logrus.DebugLevel, "added outbound channel to bridge..")
+			helpers.Log(logrus.DebugLevel, "exiting...")
 			lineChannel.Channel.StopRing()
 			ringTimeoutChan <- true
 			return
 		case <-endSub.Events():
-			utils.Log(logrus.DebugLevel, "ended call..")
+			helpers.Log(logrus.DebugLevel, "ended call..")
 			return
 		case <-rootEndSub.Events():
-			utils.Log(logrus.DebugLevel, "root inded call..")
+			helpers.Log(logrus.DebugLevel, "root inded call..")
 			resp := types.ManagerResponse{
 				Channel: lineChannel,
 				Link:    next}
@@ -206,35 +207,35 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 	model := cell.Model
 	flow := ctx.Flow
 	user := flow.User
-	utils.Log(logrus.DebugLevel, "startOutboundCall called..")
+	helpers.Log(logrus.DebugLevel, "startOutboundCall called..")
 	callerId := utils.DetermineCallerId(flow.RootCall, model.Data["caller_id"])
-	utils.Log(logrus.DebugLevel, "caller ID was set to: "+callerId)
+	helpers.Log(logrus.DebugLevel, "caller ID was set to: "+callerId)
 
 	valid, err := api.VerifyCallerId(strconv.Itoa(user.Workspace.Id), callerId)
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "verify error: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "verify error: "+err.Error())
 		return
 	}
 	if !valid {
-		utils.Log(logrus.DebugLevel, "caller id was invalid. user provided: "+callerId)
+		helpers.Log(logrus.DebugLevel, "caller id was invalid. user provided: "+callerId)
 		return
 	}
 
 	numberToCall, err := utils.DetermineNumberToCall(model.Data)
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "verify error: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "verify error: "+err.Error())
 		return
 	}
 	//key := src.New(ari.ChannelKey, rid.New(rid.Channel))
 
-	utils.Log(logrus.DebugLevel, "Calling: "+numberToCall)
+	helpers.Log(logrus.DebugLevel, "Calling: "+numberToCall)
 
 	timeout := utils.ParseRingTimeout(model.Data["timeout"])
 	outChannel := types.LineChannel{}
 	outboundChannel, err := ctx.Client.Channel().Create(nil, utils.CreateChannelRequest(numberToCall))
 
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
 		return
 	}
 
@@ -258,21 +259,21 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 		ChannelId:   outboundChannel.ID()}
 	body, err := json.Marshal(params)
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 
-	utils.Log(logrus.InfoLevel, "creating outbound call...")
+	helpers.Log(logrus.InfoLevel, "creating outbound call...")
 	resp, err := api.SendHttpRequest("/call/createCall", body)
 
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 	outCall, err := outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 
@@ -281,7 +282,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 	outboundChannel, err = outboundChannel.Originate(utils.CreateOriginateRequest(callerId, numberToCall, headers))
 
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 	outChannel.Channel = outboundChannel
@@ -311,7 +312,7 @@ func NewBridgeManager(mngrCtx *types.Context, flow *types.Flow) *BridgeManager {
 	return &item
 }
 func (man *BridgeManager) StartProcessing() {
-	utils.Log(logrus.DebugLevel, "Creating bridge... ")
+	helpers.Log(logrus.DebugLevel, "Creating bridge... ")
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	user := flow.User
@@ -324,7 +325,7 @@ func (man *BridgeManager) StartProcessing() {
 
 	callType := data["call_type"].(types.ModelDataStr)
 
-	utils.Log(logrus.DebugLevel, "processing call type: "+callType.Value)
+	helpers.Log(logrus.DebugLevel, "processing call type: "+callType.Value)
 	if callType.Value == "Extension" || callType.Value == "Phone Number" {
 		man.startSimpleCall(callType.Value)
 
@@ -345,13 +346,13 @@ func (man *BridgeManager) StartProcessing() {
 	}
 }
 func (man *BridgeManager) startSimpleCall(callType string) {
-	utils.Log(logrus.DebugLevel, "Starting simple call..")
+	helpers.Log(logrus.DebugLevel, "Starting simple call..")
 	man.ensureBridge(man.ManagerContext.Channel.Channel.Key(), callType)
 }
 
 func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 	ctx := man.ManagerContext
-	utils.Log(logrus.DebugLevel, "Starting new ext flow..")
+	helpers.Log(logrus.DebugLevel, "Starting new ext flow..")
 	workspace := user.Workspace.Id
 	channel := ctx.Channel
 	client := ctx.Client
@@ -359,7 +360,7 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 
 	subFlow, err := api.GetExtensionFlowInfo(strconv.Itoa(workspace), extension)
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "error starting new flow: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "error starting new flow: "+err.Error())
 		return
 	}
 	info := subFlow.Vars
@@ -378,7 +379,7 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 
 func (man *BridgeManager) startCallMerge(callType string) {
 	ctx := man.ManagerContext
-	utils.Log(logrus.DebugLevel, "Starting call merge")
+	helpers.Log(logrus.DebugLevel, "Starting call merge")
 
 	flow := ctx.Flow
 	id := flow.FlowId
@@ -388,12 +389,12 @@ func (man *BridgeManager) startCallMerge(callType string) {
 	bridge, err := ctx.Client.Bridge().Create(key, "mixing", key.ID)
 	if err != nil {
 		bridge = nil
-		utils.Log(logrus.DebugLevel, "failed to create bridge")
+		helpers.Log(logrus.DebugLevel, "failed to create bridge")
 		return
 	}
 
 	lineBridge := types.NewBridge(bridge)
-	utils.Log(logrus.InfoLevel, "channel added to bridge")
+	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)

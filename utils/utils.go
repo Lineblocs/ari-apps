@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"path"
@@ -21,20 +20,16 @@ import (
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/CyCoreSystems/ari/v5/ext/record"
 	"github.com/CyCoreSystems/ari/v5/rid"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	logrustash "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
-	logruscloudwatch "github.com/innix/logrus-cloudwatch"
 	"github.com/joho/godotenv"
 	"github.com/rotisserie/eris"
 	"github.com/sirupsen/logrus"
-	easy "github.com/t-tomalak/logrus-easy-formatter"
 	ffmpeg_go "github.com/u2takey/ffmpeg-go"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -346,7 +341,7 @@ func DownloadFile(flow *types.Flow, url string) (string, error) {
 	var folder string = "/tmp/"
 	uniq, err := uuid.NewUUID()
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 
@@ -392,7 +387,7 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 
 	creds, err := google.CredentialsFromJSON(ctx, serviceAccountKey)
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 	ctx2 := context.Background()
@@ -400,7 +395,7 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 	opt := option.WithCredentials(creds)
 	client, err := texttospeech.NewClient(ctx2, opt)
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 	defer client.Close()
@@ -436,7 +431,7 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 
 	resp, err := client.SynthesizeSpeech(ctx, &req)
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 
@@ -444,7 +439,7 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 	var folder string = "/tmp/"
 	uniq, err := uuid.NewUUID()
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 
@@ -453,7 +448,7 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 
 	err = ioutil.WriteFile(fullPathToFile, resp.AudioContent, 0644)
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 	fmt.Printf("Audio content written to file: %v\n", fullPathToFile)
@@ -475,7 +470,7 @@ func StartSTT(fileURI string) (string, error) {
 
 	creds, err := google.CredentialsFromJSON(ctx, serviceAccountKey)
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 	ctx2 := context.Background()
@@ -525,7 +520,7 @@ func SaveLiveRecording(result *record.Result) (string, error) {
 	var folder string = "/tmp/"
 	uniq, err := uuid.NewUUID()
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 
@@ -535,7 +530,7 @@ func SaveLiveRecording(result *record.Result) (string, error) {
 
 	err = ioutil.WriteFile(fullPathToFile, data, 0644)
 	if err != nil {
-		Log(logrus.ErrorLevel, err.Error())
+		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
 	}
 	fmt.Printf("Audio content written to file: %v\n", fullPathToFile)
@@ -595,7 +590,7 @@ func AddConfBridge(client ari.Client, workspace string, confName string, conf *t
 		BridgeId: conf.Bridge.Bridge.ID()}
 	body, err := json.Marshal(params)
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return nil, err
 	}
 
@@ -628,7 +623,7 @@ func GetConfBridge(client ari.Client, user *types.User, confName string) (*types
 }
 
 func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string, addedHeaders *[]string) error {
-	Log(logrus.DebugLevel, "ensureBridge called..")
+	helpers.Log(logrus.DebugLevel, "ensureBridge called..")
 	var bridge *ari.BridgeHandle
 	var err error
 
@@ -641,15 +636,15 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	outChannel := types.LineChannel{}
 	lineBridge := types.NewBridge(bridge)
 
-	Log(logrus.InfoLevel, "channel added to bridge")
+	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 	outboundChannel, err := cl.Channel().Create(nil, CreateChannelRequest(numberToCall))
 
 	if err != nil {
-		Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
 		return err
 	}
 
-	Log(logrus.DebugLevel, "Originating call...")
+	helpers.Log(logrus.DebugLevel, "Originating call...")
 
 	params := types.CallParams{
 		From:        callerId,
@@ -661,20 +656,20 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 		ChannelId:   outboundChannel.ID()}
 	body, err := json.Marshal(params)
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return err
 	}
 
-	Log(logrus.InfoLevel, "creating call...")
-	Log(logrus.InfoLevel, "calling "+numberToCall)
+	helpers.Log(logrus.InfoLevel, "creating call...")
+	helpers.Log(logrus.InfoLevel, "calling "+numberToCall)
 	resp, err := api.SendHttpRequest("/call/createCall", body)
 
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return err
 	}
 	id := resp.Headers.Get("x-call-id")
-	Log(logrus.DebugLevel, "Call ID is: "+id)
+	helpers.Log(logrus.DebugLevel, "Call ID is: "+id)
 	idAsInt, err := strconv.Atoi(id)
 
 	call := types.Call{
@@ -688,7 +683,7 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	headers := CreateSIPHeaders(domain, callerId, typeOfCall, apiCallId, addedHeaders)
 	outboundChannel, err = outboundChannel.Originate(CreateOriginateRequest(callerId, numberToCall, headers))
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return err
 	}
 
@@ -699,16 +694,16 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	go manageBridge(lineBridge, &call, lineChannel, &outChannel, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
-		Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
+		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
 		return errors.New("failed to add channel to bridge")
 	}
 
-	Log(logrus.InfoLevel, "creating outbound call...")
+	helpers.Log(logrus.InfoLevel, "creating outbound call...")
 	resp, err = api.SendHttpRequest("/call/createCall", body)
 	_, err = outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return err
 	}
 
@@ -732,7 +727,7 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types.LineChannel, outboundChannel *types.LineChannel, wg *sync.WaitGroup) {
 	h := bridge.Bridge
 
-	Log(logrus.DebugLevel, "manageBridge called..")
+	helpers.Log(logrus.DebugLevel, "manageBridge called..")
 	// Delete the bridge when we exit
 	defer h.Delete()
 
@@ -746,38 +741,38 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types
 	defer leaveSub.Cancel()
 
 	wg.Done()
-	Log(logrus.DebugLevel, "listening for bridge events...")
+	helpers.Log(logrus.DebugLevel, "listening for bridge events...")
 	var numChannelsEntered int = 0
 	for {
 		select {
 		case <-destroySub.Events():
-			Log(logrus.DebugLevel, "bridge destroyed")
+			helpers.Log(logrus.DebugLevel, "bridge destroyed")
 			return
 		case e, ok := <-enterSub.Events():
 			if !ok {
-				Log(logrus.ErrorLevel, "channel entered subscription closed")
+				helpers.Log(logrus.ErrorLevel, "channel entered subscription closed")
 				return
 			}
 
 			v := e.(*ari.ChannelEnteredBridge)
 			numChannelsEntered += 1
 
-			Log(logrus.DebugLevel, "channel entered bridge "+"channel "+v.Channel.Name)
-			Log(logrus.DebugLevel, "num channels in bridge: "+strconv.Itoa(numChannelsEntered))
+			helpers.Log(logrus.DebugLevel, "channel entered bridge "+"channel "+v.Channel.Name)
+			helpers.Log(logrus.DebugLevel, "num channels in bridge: "+strconv.Itoa(numChannelsEntered))
 
 		case e, ok := <-leaveSub.Events():
 			if !ok {
-				Log(logrus.ErrorLevel, "channel left subscription closed")
+				helpers.Log(logrus.ErrorLevel, "channel left subscription closed")
 				return
 			}
 			v := e.(*ari.ChannelLeftBridge)
-			Log(logrus.DebugLevel, "channel left bridge"+" channel "+v.Channel.Name)
-			Log(logrus.DebugLevel, "ending all calls in bridge...")
+			helpers.Log(logrus.DebugLevel, "channel left bridge"+" channel "+v.Channel.Name)
+			helpers.Log(logrus.DebugLevel, "ending all calls in bridge...")
 			// end both calls
 			lineChannel.SafeHangup()
 			outboundChannel.SafeHangup()
 
-			Log(logrus.DebugLevel, "updating call status...")
+			helpers.Log(logrus.DebugLevel, "updating call status...")
 			api.UpdateCall(call, "ended")
 		}
 	}
@@ -793,29 +788,29 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 	destroyedSub := outboundChannel.Channel.Subscribe(ari.Events.ChannelDestroyed)
 	defer destroyedSub.Cancel()
 	wg.Done()
-	Log(logrus.DebugLevel, "managing outbound call...")
-	Log(logrus.DebugLevel, "listening for channel events...")
+	helpers.Log(logrus.DebugLevel, "managing outbound call...")
+	helpers.Log(logrus.DebugLevel, "listening for channel events...")
 
 	for {
 
 		select {
 		case <-startSub.Events():
-			Log(logrus.DebugLevel, "started call..")
+			helpers.Log(logrus.DebugLevel, "started call..")
 
 			if err := lineBridge.Bridge.AddChannel(outboundChannel.Channel.Key().ID); err != nil {
-				Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
+				helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
 				return err
 			}
-			Log(logrus.DebugLevel, "added outbound channel to bridge..")
+			helpers.Log(logrus.DebugLevel, "added outbound channel to bridge..")
 			lineChannel.Channel.StopRing()
 			ringTimeoutChan <- true
 		case <-endSub.Events():
-			Log(logrus.DebugLevel, "ended call..")
+			helpers.Log(logrus.DebugLevel, "ended call..")
 			lineChannel.Channel.StopRing()
 			lineChannel.Channel.Hangup()
 			//lineBridge.EndBridgeCall()
 		case <-destroyedSub.Events():
-			Log(logrus.DebugLevel, "channel destroyed..")
+			helpers.Log(logrus.DebugLevel, "channel destroyed..")
 			lineChannel.Channel.StopRing()
 			lineChannel.Channel.Hangup()
 			//lineBridge.EndBridgeCall()
@@ -832,7 +827,7 @@ func ProcessSIPTrunkCall(
 	callerId string,
 	exten string,
 	trunkAddr string) error {
-	Log(logrus.DebugLevel, "ensureBridge called..")
+	helpers.Log(logrus.DebugLevel, "ensureBridge called..")
 	var bridge *ari.BridgeHandle
 	var err error
 	key := src.New(ari.BridgeKey, rid.New(rid.Bridge))
@@ -844,15 +839,15 @@ func ProcessSIPTrunkCall(
 	outChannel := types.LineChannel{}
 	lineBridge := types.NewBridge(bridge)
 
-	Log(logrus.InfoLevel, "channel added to bridge")
+	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 	outboundChannel, err := cl.Channel().Create(nil, CreateChannelRequest(exten))
 
 	if err != nil {
-		Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
 		return err
 	}
 
-	Log(logrus.DebugLevel, "Originating call...")
+	helpers.Log(logrus.DebugLevel, "Originating call...")
 
 	params := types.CallParams{
 		From:        callerId,
@@ -864,20 +859,20 @@ func ProcessSIPTrunkCall(
 		ChannelId:   outboundChannel.ID()}
 	body, err := json.Marshal(params)
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return err
 	}
 
-	Log(logrus.InfoLevel, "creating call...")
-	Log(logrus.InfoLevel, "calling "+exten)
+	helpers.Log(logrus.InfoLevel, "creating call...")
+	helpers.Log(logrus.InfoLevel, "calling "+exten)
 	resp, err := api.SendHttpRequest("/call/createCall", body)
 
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return err
 	}
 	id := resp.Headers.Get("x-call-id")
-	Log(logrus.DebugLevel, "Call ID is: "+id)
+	helpers.Log(logrus.DebugLevel, "Call ID is: "+id)
 	idAsInt, err := strconv.Atoi(id)
 
 	call := types.Call{
@@ -891,7 +886,7 @@ func ProcessSIPTrunkCall(
 	headers := CreateSIPHeadersForSIPTrunkCall(domain, callerId, "pstn", apiCallId, trunkAddr)
 	outboundChannel, err = outboundChannel.Originate(CreateOriginateRequest(callerId, exten, headers))
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return err
 	}
 
@@ -902,16 +897,16 @@ func ProcessSIPTrunkCall(
 	go manageBridge(lineBridge, &call, lineChannel, &outChannel, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
-		Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
+		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
 		return errors.New("failed to add channel to bridge")
 	}
 
-	Log(logrus.InfoLevel, "creating outbound call...")
+	helpers.Log(logrus.InfoLevel, "creating outbound call...")
 	resp, err = api.SendHttpRequest("/call/createCall", body)
 	_, err = outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
-		Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return err
 	}
 
@@ -930,58 +925,6 @@ func ProcessSIPTrunkCall(
 	wg2.Wait()
 
 	return nil
-}
-
-func Log(level logrus.Level, message string) {
-	log.Log(level, message)
-}
-
-// Init Logrus
-func InitLogrus() {
-	log = logrus.New()
-	//Default Configure for console
-	log = &logrus.Logger{
-		Out:   os.Stdout,
-		Level: logrus.DebugLevel,
-		Formatter: &easy.Formatter{
-			TimestampFormat: "2006-01-02 15:04:05",
-			LogFormat:       "%lvl%: %time% - %msg%\n",
-		},
-		Hooks: log.Hooks,
-	}
-	logEnv := Config("LOG_DESTINATIONS")
-	dests := strings.Split(logEnv, ",")
-
-	for _, dest := range dests {
-		switch dest {
-		case "file":
-			logFile, err := os.OpenFile("log.txt", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
-			if err != nil {
-				panic(err)
-			}
-			mw := io.MultiWriter(os.Stdout, logFile)
-			log.SetOutput(mw)
-		case "cloudwatch":
-			cfg, err := config.LoadDefaultConfig(context.Background())
-			if err != nil {
-				log.Fatalf("Could not load AWS config: %v", err)
-			}
-			client := cloudwatchlogs.NewFromConfig(cfg)
-
-			hook, err := logruscloudwatch.New(client, nil)
-			if err != nil {
-				log.Fatalf("Could not create CloudWatch hook: %v", err)
-			}
-			log.AddHook(hook)
-		case "logstash":
-			conn, err := net.Dial("tcp", "logstash.mycompany.net:8911")
-			if err != nil {
-				log.Fatal(err)
-			}
-			hook := logrustash.New(conn, logrustash.DefaultFormatter(logrus.Fields{"type": "myappName"}))
-			log.Hooks.Add(hook)
-		}
-	}
 }
 
 /*

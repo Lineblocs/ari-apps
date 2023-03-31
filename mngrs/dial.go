@@ -8,9 +8,10 @@ import (
 	"sync"
 
 	"github.com/CyCoreSystems/ari/v5"
+	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
 	"lineblocs.com/processor/api"
-	"lineblocs.com/processor/helpers"
+	processor_helpers "lineblocs.com/processor/helpers"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
@@ -25,16 +26,16 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 	lineChannel := ctx.Channel
 	cell := ctx.Cell
 	flow := ctx.Flow
-	record := helpers.NewRecording(flow.User, &outCall.CallId, false)
+	record := processor_helpers.NewRecording(flow.User, &outCall.CallId, false)
 	_, recordErr := record.InitiateRecordingForChannel(outboundChannel)
 
 	if recordErr != nil {
-		utils.Log(logrus.ErrorLevel, "error starting recording: "+recordErr.Error())
+		helpers.Log(logrus.ErrorLevel, "error starting recording: "+recordErr.Error())
 		return
 	}
 
-	utils.Log(logrus.DebugLevel, "Dial source link count: "+strconv.Itoa(len(cell.SourceLinks)))
-	utils.Log(logrus.DebugLevel, "Dial target link count: "+strconv.Itoa(len(cell.TargetLinks)))
+	helpers.Log(logrus.DebugLevel, "Dial source link count: "+strconv.Itoa(len(cell.SourceLinks)))
+	helpers.Log(logrus.DebugLevel, "Dial target link count: "+strconv.Itoa(len(cell.TargetLinks)))
 
 	answer, _ := utils.FindLinkByName(cell.SourceLinks, "source", "Answer")
 	//noAnswer, _ = utils.FindLinkByName( cell.SourceLinks, "source", "No Answer")
@@ -48,14 +49,14 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 	defer rootEndSub.Cancel()
 
 	wg.Done()
-	utils.Log(logrus.DebugLevel, "listening for channel events...")
+	helpers.Log(logrus.DebugLevel, "listening for channel events...")
 
 	for {
 
 		select {
 		case <-startSub.Events():
-			utils.Log(logrus.DebugLevel, "started call..")
-			utils.Log(logrus.DebugLevel, "SENDING ANSWER RESP...")
+			helpers.Log(logrus.DebugLevel, "started call..")
+			helpers.Log(logrus.DebugLevel, "SENDING ANSWER RESP...")
 			resp := types.ManagerResponse{
 				Channel: outboundChannel,
 				Link:    answer}
@@ -63,11 +64,11 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 			ringTimeoutChan <- true
 			return
 		case <-endSub.Events():
-			utils.Log(logrus.DebugLevel, "ended call..")
+			helpers.Log(logrus.DebugLevel, "ended call..")
 			record.Stop()
 			return
 		case <-rootEndSub.Events():
-			utils.Log(logrus.DebugLevel, "root inded call..")
+			helpers.Log(logrus.DebugLevel, "root inded call..")
 			return
 
 		}
@@ -81,29 +82,29 @@ func (man *DialManager) startOutboundCall(callType string) {
 	flow := ctx.Flow
 	user := flow.User
 
-	utils.Log(logrus.DebugLevel, "startOutboundCall called..")
+	helpers.Log(logrus.DebugLevel, "startOutboundCall called..")
 
 	callerId := utils.DetermineCallerId(flow.RootCall, model.Data["caller_id"])
-	utils.Log(logrus.DebugLevel, "caller ID was set to: "+callerId)
+	helpers.Log(logrus.DebugLevel, "caller ID was set to: "+callerId)
 
 	valid, err := api.VerifyCallerId(strconv.Itoa(user.Workspace.Id), callerId)
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "verify error: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "verify error: "+err.Error())
 		return
 	}
 	if !valid {
-		utils.Log(logrus.DebugLevel, "caller id was invalid. user provided: "+callerId)
+		helpers.Log(logrus.DebugLevel, "caller id was invalid. user provided: "+callerId)
 		return
 	}
 
 	numberToCall, err := utils.DetermineNumberToCall(model.Data)
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "verify error: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "verify error: "+err.Error())
 		return
 	}
 	//key := src.New(ari.ChannelKey, rid.New(rid.Channel))
 
-	utils.Log(logrus.DebugLevel, "Calling: "+numberToCall)
+	helpers.Log(logrus.DebugLevel, "Calling: "+numberToCall)
 
 	timeout := utils.ParseRingTimeout(model.Data["timeout"])
 
@@ -111,7 +112,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 	outboundChannel, err := ctx.Client.Channel().Create(nil, utils.CreateChannelRequest(numberToCall))
 
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
+		helpers.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
 		return
 	}
 
@@ -136,16 +137,16 @@ func (man *DialManager) startOutboundCall(callType string) {
 		ChannelId:   outboundChannel.ID()}
 	body, err := json.Marshal(params)
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 
-	utils.Log(logrus.InfoLevel, "creating outbound call...")
+	helpers.Log(logrus.InfoLevel, "creating outbound call...")
 	resp, err := api.SendHttpRequest("/call/createCall", body)
 	outCall, err := outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
 
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 
@@ -154,7 +155,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 	outboundChannel, err = outboundChannel.Originate(utils.CreateOriginateRequest(callerId, numberToCall, headers))
 
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
 	outChannel.Channel = outboundChannel
@@ -188,10 +189,10 @@ func (man *DialManager) StartProcessing() {
 
 	callType := data["call_type"].(types.ModelDataStr)
 
-	utils.Log(logrus.DebugLevel, "processing call type: "+callType.Value)
-	utils.Log(logrus.DebugLevel, "Creating DIAL... ")
+	helpers.Log(logrus.DebugLevel, "processing call type: "+callType.Value)
+	helpers.Log(logrus.DebugLevel, "Creating DIAL... ")
 
-	utils.Log(logrus.InfoLevel, "channel added to bridge")
+	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 
 	switch callType.Value {
 	case "Extension":

@@ -9,6 +9,7 @@ import (
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/sirupsen/logrus"
 
+	helpers "github.com/Lineblocs/go-helpers"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
@@ -26,7 +27,7 @@ func NewInputManager(mngrCtx *types.Context, flow *types.Flow) *InputManager {
 	return &item
 }
 func (man *InputManager) StartProcessing() {
-	utils.Log(logrus.DebugLevel, "Creating playback for INPUT... ")
+	helpers.Log(logrus.DebugLevel, "Creating playback for INPUT... ")
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	data := cell.Model.Data
@@ -37,7 +38,7 @@ func (man *InputManager) StartProcessing() {
 	stopTimeout, err := strconv.ParseFloat(data["stop_timeout"].(types.ModelDataStr).Value, 64)
 
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "error parsing stop timeout. value was:  "+data["stop_timeout"].(types.ModelDataStr).Value)
+		helpers.Log(logrus.DebugLevel, "error parsing stop timeout. value was:  "+data["stop_timeout"].(types.ModelDataStr).Value)
 		return
 	}
 
@@ -52,31 +53,31 @@ func (man *InputManager) StartProcessing() {
 	wg1.Wait()
 
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "error parsing max digits. value was:  "+data["max_digits"].(types.ModelDataStr).Value)
+		helpers.Log(logrus.DebugLevel, "error parsing max digits. value was:  "+data["max_digits"].(types.ModelDataStr).Value)
 		return
 	}
 
 	switch playbackType {
 	case "Say":
 
-		utils.Log(logrus.DebugLevel, "processing TTS")
+		helpers.Log(logrus.DebugLevel, "processing TTS")
 		file, err := utils.StartTTS(data["text_to_say"].(types.ModelDataStr).Value,
 			data["text_gender"].(types.ModelDataStr).Value,
 			data["voice"].(types.ModelDataStr).Value,
 			data["text_language"].(types.ModelDataStr).Value,
 		)
 		if err != nil {
-			utils.Log(logrus.ErrorLevel, "error downloading: "+err.Error())
+			helpers.Log(logrus.ErrorLevel, "error downloading: "+err.Error())
 		}
 
 		go man.beginPrompt(file, stopChannel)
 	case "Play":
 
-		utils.Log(logrus.DebugLevel, "processing TTS")
+		helpers.Log(logrus.DebugLevel, "processing TTS")
 		file, err := utils.DownloadFile(flow, data["url_audio"].(types.ModelDataStr).Value)
 
 		if err != nil {
-			utils.Log(logrus.ErrorLevel, "error downloading: "+err.Error())
+			helpers.Log(logrus.ErrorLevel, "error downloading: "+err.Error())
 		}
 		go man.beginPrompt(file, stopChannel)
 
@@ -86,7 +87,7 @@ func (man *InputManager) StartProcessing() {
 func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int, stopGatherOnKeypress bool, keypressKeyStop string, wg *sync.WaitGroup, stopChannel chan<- bool) {
 	channel := man.ManagerContext.Channel
 	ctx := man.ManagerContext.Context
-	utils.Log(logrus.DebugLevel, "listening for DTMF..")
+	helpers.Log(logrus.DebugLevel, "listening for DTMF..")
 	dtmfSub := channel.Channel.Subscribe(ari.Events.ChannelDtmfReceived)
 	defer dtmfSub.Cancel()
 	var timeLastDtmfWasReceived *time.Time
@@ -102,13 +103,13 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 		case e, ok := <-dtmfSub.Events():
 
 			if !ok {
-				utils.Log(logrus.DebugLevel, "error fetching event")
+				helpers.Log(logrus.DebugLevel, "error fetching event")
 				return
 			}
 
 			v := e.(*ari.ChannelDtmfReceived)
 			digit := v.Digit
-			utils.Log(logrus.DebugLevel, "input received DTMF: "+digit)
+			helpers.Log(logrus.DebugLevel, "input received DTMF: "+digit)
 
 			// stop due to key pressed
 			if stopGatherOnKeypress && digit == keypressKeyStop {
@@ -147,24 +148,24 @@ func (man *InputManager) beginPrompt(prompt string, stopChannel <-chan bool) {
 	uri := "sound:" + prompt
 	playback, err := channel.Channel.Play(channel.Channel.Key().ID, uri)
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "failed to play join sound, error:"+err.Error())
+		helpers.Log(logrus.ErrorLevel, "failed to play join sound, error:"+err.Error())
 		return
 	}
 	finishedSub := playback.Subscribe(ari.Events.PlaybackFinished)
 	defer finishedSub.Cancel()
-	utils.Log(logrus.DebugLevel, "PLAYBACK started...")
+	helpers.Log(logrus.DebugLevel, "PLAYBACK started...")
 
 	for {
 		select {
 		case <-finishedSub.Events():
-			utils.Log(logrus.DebugLevel, "playback finished...")
+			helpers.Log(logrus.DebugLevel, "playback finished...")
 			return
 
 		case <-stopChannel:
-			utils.Log(logrus.DebugLevel, "requested playback stop..")
+			helpers.Log(logrus.DebugLevel, "requested playback stop..")
 			err := playback.Stop()
 			if err != nil {
-				utils.Log(logrus.DebugLevel, "error occured: "+err.Error())
+				helpers.Log(logrus.DebugLevel, "error occured: "+err.Error())
 			}
 			return
 		}
@@ -176,7 +177,7 @@ func (man *InputManager) finishProcessingDTMF(result string) {
 
 	cell := man.ManagerContext.Cell
 
-	utils.Log(logrus.DebugLevel, "finish processing DTMF...")
+	helpers.Log(logrus.DebugLevel, "finish processing DTMF...")
 	cell.EventVars["digits"] = result
 	digits, _ := utils.FindLinkByName(cell.SourceLinks, "source", "Digits Received")
 	resp := types.ManagerResponse{

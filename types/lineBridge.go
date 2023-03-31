@@ -25,7 +25,6 @@ func NewBridge(bridge *ari.BridgeHandle) *LineBridge {
 
 func (b *LineBridge) EndBridgeCall() {
 	for _, item := range b.Channels {
-		//utils.Log(logrus.DebugLevel,"ending call: " + item.Channel.Key().ID)
 		if item != nil {
 			item.Channel.Hangup()
 		}
