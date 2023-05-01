@@ -7,6 +7,7 @@ import (
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/sirupsen/logrus"
 
+	helpers "github.com/Lineblocs/go-helpers"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
@@ -28,7 +29,7 @@ func (man *PlaybackManager) StartProcessing() {
 }
 
 func (man *PlaybackManager) processPlayback() {
-	utils.Log(logrus.DebugLevel, "Creating playback... ")
+	helpers.Log(logrus.DebugLevel, "Creating playback... ")
 	cell := man.ManagerContext.Cell
 	flow := man.ManagerContext.Flow
 	channel := man.ManagerContext.Channel
@@ -43,24 +44,28 @@ func (man *PlaybackManager) processPlayback() {
 		switch playbackType {
 		case "Say":
 
-			utils.Log(logrus.DebugLevel, "processing TTS")
+			helpers.Log(logrus.DebugLevel, "processing TTS")
 			file, err := utils.StartTTS(data["text_to_say"].(types.ModelDataStr).Value,
 				data["text_gender"].(types.ModelDataStr).Value,
 				data["voice"].(types.ModelDataStr).Value,
 				data["text_language"].(types.ModelDataStr).Value)
 			if err != nil {
-				utils.Log(logrus.ErrorLevel,"error downloading: " + err.Error())
+				helpers.Log(logrus.ErrorLevel,"error downloading: " + err.Error())
+				man.errorResult()
+				return
 			}
 
 			man.beginPrompt(file)
 			time.Sleep(time.Duration(time.Millisecond * 100))
 		case "Play":
 
-			utils.Log(logrus.DebugLevel, "processing file download")
+			helpers.Log(logrus.DebugLevel, "processing file download")
 			file, err := utils.DownloadFile(flow, data["url_audio"].(types.ModelDataStr).Value)
 
 			if err != nil {
-				utils.Log(logrus.ErrorLevel, "error downloading: "+err.Error())
+				helpers.Log(logrus.ErrorLevel, "error downloading: "+err.Error())
+				man.errorResult()
+				return
 			}
 
 			man.beginPrompt(file)
@@ -72,13 +77,22 @@ func (man *PlaybackManager) processPlayback() {
 		Link:    next}
 	man.ManagerContext.RecvChannel <- &resp
 }
+
+func (man *PlaybackManager) errorResult() {
+	channel := man.ManagerContext.Channel
+	resp := types.ManagerResponse{
+		Channel: channel,
+		Link:    nil}
+	man.ManagerContext.RecvChannel <- &resp
+}
+
 func (man *PlaybackManager) beginPrompt(prompt string) {
 	channel := man.ManagerContext.Channel
 	//cell := man.ManagerContext.Cell
 	uri := "sound:" + prompt
 	playback, err := channel.Channel.Play(channel.Channel.Key().ID, uri)
 	if err != nil {
-		utils.Log(logrus.ErrorLevel, "failed to play join sound, error:"+err.Error())
+		helpers.Log(logrus.ErrorLevel, "failed to play join sound, error:"+err.Error())
 		return
 	}
 
@@ -86,11 +100,11 @@ func (man *PlaybackManager) beginPrompt(prompt string) {
 	finishedSub := playback.Subscribe(ari.Events.PlaybackFinished)
 	defer finishedSub.Cancel()
 
-	utils.Log(logrus.DebugLevel, "waiting for playback to finish...")
+	helpers.Log(logrus.DebugLevel, "waiting for playback to finish...")
 	for {
 		select {
 		case <-finishedSub.Events():
-			utils.Log(logrus.DebugLevel, "playback finished...")
+			helpers.Log(logrus.DebugLevel, "playback finished...")
 			/*
 				resp := types.ManagerResponse{
 					Channel: channel,

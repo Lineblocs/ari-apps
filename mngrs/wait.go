@@ -6,6 +6,7 @@ import (
 	//"github.com/CyCoreSystems/ari/v5"
 	"strconv"
 
+	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
@@ -24,7 +25,7 @@ func NewWaitManager(mngrCtx *types.Context, flow *types.Flow) *WaitManager {
 	return &item
 }
 func (man *WaitManager) StartProcessing() {
-	utils.Log(logrus.DebugLevel, "starting WAIT...")
+	helpers.Log(logrus.DebugLevel, "starting WAIT...")
 	//man.ManagerContext.RecvChannel <- *item
 
 	ctx := man.ManagerContext
@@ -35,7 +36,7 @@ func (man *WaitManager) StartProcessing() {
 
 	val, err := strconv.Atoi(model.Data["wait_seconds"].(types.ModelDataStr).Value)
 	if err != nil {
-		utils.Log(logrus.DebugLevel, "could not parse wait timeout of: "+model.Data["wait_seconds"].(types.ModelDataStr).Value)
+		helpers.Log(logrus.DebugLevel, "could not parse wait timeout of: "+model.Data["wait_seconds"].(types.ModelDataStr).Value)
 		man.ManagerContext.RecvChannel <- nil
 		return
 	}

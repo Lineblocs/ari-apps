@@ -5,9 +5,9 @@ import (
 	"strconv"
 
 	"github.com/CyCoreSystems/ari/v5"
+	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
 	"lineblocs.com/processor/types"
-	"lineblocs.com/processor/utils"
 )
 
 type BaseManager interface {
@@ -15,13 +15,13 @@ type BaseManager interface {
 }
 
 func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell, runner *types.Runner) {
-	utils.Log(logrus.DebugLevel, "processing cell type "+cell.Cell.Type)
+	helpers.Log(logrus.DebugLevel, "processing cell type "+cell.Cell.Type)
 	if runner.Cancelled {
-		utils.Log(logrus.DebugLevel, "flow runner was cancelled - exiting")
+		helpers.Log(logrus.DebugLevel, "flow runner was cancelled - exiting")
 		return
 	}
-	utils.Log(logrus.DebugLevel, "source link count: "+strconv.Itoa(len(cell.SourceLinks)))
-	utils.Log(logrus.DebugLevel, "target link count: "+strconv.Itoa(len(cell.TargetLinks)))
+	helpers.Log(logrus.DebugLevel, "source link count: "+strconv.Itoa(len(cell.SourceLinks)))
+	helpers.Log(logrus.DebugLevel, "target link count: "+strconv.Itoa(len(cell.TargetLinks)))
 
 	manRecvChannel := make(chan *types.ManagerResponse)
 	lineCtx := types.NewContext(
@@ -61,25 +61,25 @@ func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, l
 	case "devs.ConferenceModel":
 		mngr = NewConferenceManager(lineCtx, flow)
 	default:
-		utils.Log(logrus.InfoLevel, "unknown type of cell..")
+		helpers.Log(logrus.InfoLevel, "unknown type of cell..")
 		return
 
 	}
 	mngr.StartProcessing()
 
-	utils.Log(logrus.DebugLevel, "waiting to receive from channel...")
+	helpers.Log(logrus.DebugLevel, "waiting to receive from channel...")
 	for {
 		select {
 		case resp, ok := <-manRecvChannel:
 			if !ok {
-				utils.Log(logrus.DebugLevel, "error receiving result from cell..")
+				helpers.Log(logrus.DebugLevel, "error receiving result from cell..")
 				return
 			}
-			utils.Log(logrus.DebugLevel, "ended process for cell")
-			utils.Log(logrus.DebugLevel, "moving to next..")
+			helpers.Log(logrus.DebugLevel, "ended process for cell")
+			helpers.Log(logrus.DebugLevel, "moving to next..")
 
 			if resp.Link == nil {
-				utils.Log(logrus.DebugLevel, "no target found... hanging up")
+				helpers.Log(logrus.DebugLevel, "no target found... hanging up")
 				resp.Channel.SafeHangup()
 				return
 			}
@@ -91,7 +91,7 @@ func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, l
 }
 
 func ProcessFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell) {
-	utils.Log(logrus.DebugLevel, "processing cell type "+cell.Cell.Type)
+	helpers.Log(logrus.DebugLevel, "processing cell type "+cell.Cell.Type)
 	runner := types.Runner{Cancelled: false}
 	flow.Runners = append(flow.Runners, &runner)
 	startProcessingFlow(cl, ctx, flow, lineChannel, eventVars, cell, &runner)

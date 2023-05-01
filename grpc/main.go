@@ -7,10 +7,10 @@ import (
 	"net/http"
 
 	"github.com/CyCoreSystems/ari/v5"
+	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	grpc_engine "google.golang.org/grpc"
-	"lineblocs.com/processor/utils"
 )
 
 var addr = "0.0.0.0:8018"
@@ -59,11 +59,11 @@ func ws(w http.ResponseWriter, r *http.Request) {
 	stopChan := make(chan bool)
 	clientId := v.Get("clientId")
 	wsChan := createWSChan(clientId)
-	utils.Log(logrus.InfoLevel, fmt.Sprintf("got connection from: %s\r\n", clientId))
-	utils.Log(logrus.InfoLevel, fmt.Sprintf("Req: %s %s\n", r.Host, r.URL.Path))
+	helpers.Log(logrus.InfoLevel, fmt.Sprintf("got connection from: %s\r\n", clientId))
+	helpers.Log(logrus.InfoLevel, fmt.Sprintf("Req: %s %s\n", r.Host, r.URL.Path))
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		utils.Log(logrus.InfoLevel, "upgrade:"+err.Error())
+		helpers.Log(logrus.InfoLevel, "upgrade:"+err.Error())
 		return
 	}
 	go processEvents(c, clientId, wsChan, stopChan)
@@ -71,12 +71,12 @@ func ws(w http.ResponseWriter, r *http.Request) {
 	for {
 		_, _, err := c.ReadMessage()
 		if err != nil {
-			utils.Log(logrus.InfoLevel, "read:"+err.Error())
+			helpers.Log(logrus.InfoLevel, "read:"+err.Error())
 			stopChan <- true
 			c.Close()
 			break
 		}
-		// utils.Log(logrus.InfoLevel, fmt.Sprintf("recv: %s", message))
+		// helpers.Log(logrus.InfoLevel, fmt.Sprintf("recv: %s", message))
 	}
 }
 
@@ -88,14 +88,14 @@ func healthz(w http.ResponseWriter, r *http.Request) {
 func startWebsocketServer() {
 	http.HandleFunc("/", ws)
 	http.HandleFunc("/healthz", healthz)
-	utils.Log(logrus.FatalLevel, http.ListenAndServe(addr, nil).Error())
+	helpers.Log(logrus.FatalLevel, http.ListenAndServe(addr, nil).Error())
 }
 func StartListener(cl ari.Client) {
 	return
 	wsChan := make(chan *ClientEvent)
 	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", 9000))
 	if err != nil {
-		utils.Log(logrus.FatalLevel, fmt.Sprintf("failed to listen: %v", err))
+		helpers.Log(logrus.FatalLevel, fmt.Sprintf("failed to listen: %v", err))
 	}
 
 	go startWebsocketServer()
@@ -107,6 +107,6 @@ func StartListener(cl ari.Client) {
 	RegisterLineblocsServer(grpcServer, s)
 
 	if err := grpcServer.Serve(lis); err != nil {
-		utils.Log(logrus.FatalLevel, fmt.Sprintf("failed to serve: %s", err))
+		helpers.Log(logrus.FatalLevel, fmt.Sprintf("failed to serve: %s", err))
 	}
 }
