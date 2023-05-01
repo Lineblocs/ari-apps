@@ -29,6 +29,7 @@ func (man *SendDigitsManager) StartProcessing() {
 	keys := data["text"].(types.ModelDataStr).Value
 	lineChannel := man.ManagerContext.Channel
 	//dtmfOpts := &ari.DTMFOptions{}
+
 	for i := 0; i < len(keys); i++ {
     	key:= string( keys[i] )
 		helpers.Log(logrus.DebugLevel, "sending DTMF " + key)
