@@ -1,0 +1,38 @@
+version: "3.6"
+x-logging: &default-logging
+  options:
+    max-size: "100m"
+    max-file: "5"
+  driver: json-file
+services:
+  ari_apps:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: lineblocs-ari-apps
+    logging: *default-logging
+    container_name: lineblocs-ari-apps
+    volumes:
+      - ..:/app
+      - ../netdiscover:/bin/netdiscover
+      - ../go.mod:/go.mod 
+      - ../go.sum:/go.sum
+
+    restart: unless-stopped
+    # environment:
+    #   - DEPLOYMENT_DOMAIN=${DEPLOYMENT_DOMAIN}
+    #   - ARI_HOST=${ARI_HOST}
+    #   - ARI_PORT=${ARI_PORT}
+    #   - ARI_USERNAME=${ARI_USERNAME}
+    #   - ARI_PASSWORD=${ARI_PASSWORD}
+    #   - ARI_USE_PROXY=${ARI_USE_PROXY}
+    #   - LINEBLOCS_KEY=${LINEBLOCS_KEY}
+    #   - NATSGW_URL=
+    #   - PROXY_HOST=
+    #   - USE_DOTENV=
+    entrypoint:
+      sh -c "
+        /bin/bash ;
+        /app/dev/entrypoint.sh ;
+      "
+    network_mode: "host"
