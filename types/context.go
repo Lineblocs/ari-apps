@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/CyCoreSystems/ari/v5"
+	"github.com/ivahaev/amigo"
 )
 
 type Context struct {
@@ -17,6 +18,7 @@ type Context struct {
 	Vars        *FlowVars
 	Context     context.Context
 	Client      ari.Client
+	AMIClient   *amigo.Amigo
 	RecvChannel chan<- *ManagerResponse
 }
 
@@ -76,7 +78,16 @@ func processAllInterpolations(data map[string]ModelData, lineFlow *Flow) {
 		processInterpolation(&val, lineFlow)
 	}
 }
-func NewContext(cl ari.Client, ctx context.Context, recvChannel chan<- *ManagerResponse, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) *Context {
+func NewContext(cl ari.Client, amiClient *amigo.Amigo, ctx context.Context, recvChannel chan<- *ManagerResponse, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) *Context {
 	processAllInterpolations(cell.Model.Data, flow)
-	return &Context{Client: cl, Context: ctx, Channel: channel, Cell: cell, Flow: flow, Runner: runner, RecvChannel: recvChannel}
+	return &Context{
+		Client: cl, 
+		AMIClient: amiClient,
+		Context: ctx, 
+		Channel: channel, 
+		Cell: cell, 
+		Flow: flow, 
+		Runner: runner, 
+		RecvChannel: recvChannel,
+	}
 }

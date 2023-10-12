@@ -60,6 +60,7 @@ require (
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/inconshreveable/log15 v0.0.0-20201112154412-8562bdadbbac // indirect
 	github.com/innix/logrus-cloudwatch v1.0.0 // indirect
+	github.com/ivahaev/amigo v0.1.10 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.10 // indirect

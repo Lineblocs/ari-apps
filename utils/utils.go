@@ -30,6 +30,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rotisserie/eris"
 	"github.com/sirupsen/logrus"
+	"github.com/ivahaev/amigo"
 	ffmpeg_go "github.com/u2takey/ffmpeg-go"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -925,6 +926,50 @@ func ProcessSIPTrunkCall(
 	wg2.Wait()
 
 	return nil
+}
+
+func DeviceStateChangeHandler(m map[string]string) {
+	fmt.Printf("DeviceStateChange event received: %v\n", m)
+}
+
+func DefaultHandler(m map[string]string) {
+	fmt.Printf("Event received: %v\n", m)
+}
+
+func CreateAMIClient() (*amigo.Amigo, error) {
+	settings := &amigo.Settings{
+		Username: os.Getenv("AMI_USER"),
+		Password: os.Getenv("AMI_PASS"),
+		Host: os.Getenv("AMI_HOST"),
+	}
+	a := amigo.New(settings)
+
+	a.Connect()
+
+	// Listen for connection events
+	a.On("connect", func(message string) {
+		fmt.Println("connected to AMI. " + message)
+	})
+	a.On("error", func(message string) {
+		fmt.Println("AMI error occured: " + message)
+	})
+
+	// Registering handler function for event "DeviceStateChange"
+	a.RegisterHandler("DeviceStateChange", DeviceStateChangeHandler)
+	// Registering default handler function for all events.
+	a.RegisterDefaultHandler(DefaultHandler)
+
+	// Optionally create channel to receiving all events
+	// and set created channel to receive all events
+	//c := make(chan map[string]string, 100)
+	//a.SetEventChannel(c)
+
+	// Check if connected with Asterisk, will send Action "QueueSummary"
+	if a.Connected() {
+		return a,nil
+	}
+
+	return nil,errors.New("Could not connect to AMI")
 }
 
 /*

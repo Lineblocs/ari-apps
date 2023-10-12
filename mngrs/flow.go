@@ -7,14 +7,16 @@ import (
 	"github.com/CyCoreSystems/ari/v5"
 	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
+	"github.com/ivahaev/amigo"
 	"lineblocs.com/processor/types"
+	"lineblocs.com/processor/utils"
 )
 
 type BaseManager interface {
 	StartProcessing()
 }
 
-func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell, runner *types.Runner) {
+func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell, runner *types.Runner) {
 	helpers.Log(logrus.DebugLevel, "processing cell type "+cell.Cell.Type)
 	if runner.Cancelled {
 		helpers.Log(logrus.DebugLevel, "flow runner was cancelled - exiting")
@@ -26,6 +28,7 @@ func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, l
 	manRecvChannel := make(chan *types.ManagerResponse)
 	lineCtx := types.NewContext(
 		cl,
+		amiClient,
 		ctx,
 		manRecvChannel,
 		flow,
@@ -37,7 +40,7 @@ func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, l
 	switch cell.Cell.Type {
 	case "devs.LaunchModel":
 		for _, link := range cell.SourceLinks {
-			go startProcessingFlow(cl, ctx, flow, lineChannel, eventVars, link.Target, runner)
+			go startProcessingFlow(cl, amiClient, ctx, flow, lineChannel, eventVars, link.Target, runner)
 		}
 		return
 	case "devs.SwitchModel":
@@ -54,6 +57,8 @@ func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, l
 		mngr = NewSetVariablesManager(lineCtx, flow)
 	case "devs.WaitModel":
 		mngr = NewWaitManager(lineCtx, flow)
+	case "devs.StreamAudioModel":
+		mngr = NewStreamAudioManager(lineCtx, flow)
 	case "devs.SendDigitsModel":
 		mngr = NewSendDigitsManager(lineCtx, flow)
 	case "devs.MacroModel":
@@ -84,7 +89,7 @@ func startProcessingFlow(cl ari.Client, ctx context.Context, flow *types.Flow, l
 				return
 			}
 			next := resp.Link
-			defer startProcessingFlow(cl, ctx, flow, resp.Channel, eventVars, next.Target, runner)
+			defer startProcessingFlow(cl, amiClient, ctx, flow, resp.Channel, eventVars, next.Target, runner)
 			return
 		}
 	}
@@ -94,5 +99,10 @@ func ProcessFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChann
 	helpers.Log(logrus.DebugLevel, "processing cell type "+cell.Cell.Type)
 	runner := types.Runner{Cancelled: false}
 	flow.Runners = append(flow.Runners, &runner)
-	startProcessingFlow(cl, ctx, flow, lineChannel, eventVars, cell, &runner)
+	amiClient, err := utils.CreateAMIClient()
+	if err != nil {
+		helpers.Log(logrus.ErrorLevel, "ProcessFlow error: could not create AMI client")
+		return
+	}
+	startProcessingFlow(cl, amiClient, ctx, flow, lineChannel, eventVars, cell, &runner)
 }
