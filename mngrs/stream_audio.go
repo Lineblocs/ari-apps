@@ -26,7 +26,7 @@ func (man *StreamAudioManager) StartProcessing() {
 	cell := man.ManagerContext.Cell
 	amiClient := man.ManagerContext.AMIClient
 	data := cell.Model.Data
-	next, _ := utils.FindLinkByName(cell.SourceLinks, "source", "Completed")
+	next, _ := utils.FindLinkByName(cell.SourceLinks, "source", "Done")
 	fail, _ := utils.FindLinkByName(cell.SourceLinks, "source", "Fail")
 	direction := data["direction"].(types.ModelDataStr).Value
 	websocketServer := data["websocket_server"].(types.ModelDataStr).Value
