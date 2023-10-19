@@ -36,3 +36,45 @@ services:
         /app/dev/entrypoint.sh ;
       "
     network_mode: "host"
+
+  asterisk:
+    build:
+      context: ../../asterisk/
+      dockerfile: Dockerfile
+    image: lineblocs-asterisk
+    volumes:
+      - ../../asterisk/configs:/etc/asterisk/
+    logging: *default-logging
+    container_name: lineblocs-asterisk
+    restart: unless-stopped
+    environment:
+      - AMI_USER=${AMI_USER}
+      - AMI_PASS=${AMI_PASS}
+      - AMI_PORT=${AMI_PORT}
+      - AMI_HOST=${AMI_HOST}
+      - ARI_USERNAME=${ARI_USERNAME}
+      - ARI_PASSWORD=${ARI_PASSWORD}
+      - LINEBLOCS_KEY=${LINEBLOCS_KEY}
+    profiles:
+      - asterisk-local
+    network_mode: "host"
+
+  asterisk-cloud:
+    image: lineblocs/asterisk:${VERSION}
+    # to enable costum config. Please uncomment volumes and that value. Also make sure, you have asterisk project
+    # volumes:
+    #   - ../../asterisk/configs:/etc/asterisk/
+    logging: *default-logging
+    container_name: lineblocs-asterisk-cloud
+    restart: unless-stopped
+    environment:
+      - AMI_USER=${AMI_USER}
+      - AMI_PASS=${AMI_PASS}
+      - AMI_PORT=${AMI_PORT}
+      - AMI_HOST=${AMI_HOST}
+      - ARI_USERNAME=${ARI_USERNAME}
+      - ARI_PASSWORD=${ARI_PASSWORD}
+      - LINEBLOCS_KEY=${LINEBLOCS_KEY}
+    profiles:
+      - asterisk-cloud
+    network_mode: "host"

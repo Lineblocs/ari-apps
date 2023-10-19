@@ -2,12 +2,14 @@
 
 ## Structure of directory
 ```shell
-.
+ari-apps
 ├── api
 ├── bitbucket-pipelines.yml
 ├── dev
 |  ├── docker-compose.yaml
 |  └── entrypoint.sh
+|  └── README.md
+|  └── .env
 ├── Dockerfile
 ├── entrypoint.sh
 ├── go.mod
@@ -27,6 +29,7 @@
 ├── router.proto
 ├── types
 └── utils
+asterisk
 
 ```
 
@@ -35,7 +38,8 @@
 $ git clone https://github.com/Lineblocs/ari-apps.git
 $ cp .env.docker .env
 $ cd ari-apps/dev
-$ docker compose up -d
+$ cp .env.example .env
+$ docker compose --profile asterisk-cloud up -d
 ```
 
 ## Advance running
@@ -46,7 +50,8 @@ Clone docker compose and move to directory.
 $ git clone https://github.com/Lineblocs/ari-apps.git
 ```
 
-### Make .env file and confige
+### Make .env file and configure
+env file for ari-apps
 ```shell
 $ cp .env.docker .env
 ```
@@ -55,11 +60,22 @@ $ cp .env.docker .env
 $ cd ari-apps/dev
 ```
 
+### Make .env file and configure
+env file for docker compose and asterisk
+```shell
+$ cp .env.example .env
+```
+
 ###  create container
 Create and run container with this command below. 
 
 ```shell
-$ docker compose up -d
+$ docker compose --profile asterisk-cloud up -d
+```
+
+While want to modify asterisk configuration, build asterisk on local. Use profile asterisk-local to do that. Also clone asterisk project, put on same directory with ari-apps project. Create and run container with this command below. 
+```shell
+$ docker compose --profile asterisk-local up -d
 ```
 
 ### Useful command
