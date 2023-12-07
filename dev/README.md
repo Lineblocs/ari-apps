@@ -1,5 +1,8 @@
 # Use Docker Compose to develop lineblocs - ari-apps
 
+## Notice
+Please make sure use docker compose with minimal version 2.2
+
 ## Structure of directory
 ```shell
 ari-apps
@@ -40,6 +43,7 @@ $ cp .env.docker .env
 $ cd ari-apps/dev
 $ cp .env.example .env
 $ docker compose --profile asterisk-cloud up -d
+$ docker compose  watch
 ```
 
 ## Advance running
@@ -76,6 +80,7 @@ $ docker compose --profile asterisk-cloud up -d
 While want to modify asterisk configuration, build asterisk on local. Use profile asterisk-local to do that. Also clone asterisk project, put on same directory with ari-apps project. Create and run container with this command below. 
 ```shell
 $ docker compose --profile asterisk-local up -d
+$ docker compose  watch
 ```
 
 ### Useful command

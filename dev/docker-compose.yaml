@@ -12,12 +12,33 @@ services:
     image: lineblocs-ari-apps
     logging: *default-logging
     container_name: lineblocs-ari-apps
-    volumes:
-      - ..:/app
-      - ../netdiscover:/bin/netdiscover
-      - ../go.mod:/go.mod 
-      - ../go.sum:/go.sum
-
+    # Please choose, use block of "volumes" or "develop"
+    # volumes:
+    #   - ..:/app
+    #   - ../netdiscover:/bin/netdiscover
+    #   - ../go.mod:/go.mod 
+    #   - ../go.sum:/go.sum
+    develop:
+      watch:
+        - action: sync
+          path: ..
+          target: /app
+        - action: sync+restart
+          path: ./entrypoint.sh
+          target: /app/dev/entrypoint.sh
+        - action: sync+restart
+          path: ../netdiscover
+          target: /bin/netdiscover
+        - action: sync+restart
+          path: ../go.mod
+          target: /go.mod
+        - action: sync+restart
+          path: ../go.sum
+          target: /go.sum
+        - action: rebuild
+          path: ./Dockerfile
+        - action: rebuild
+          path: ./docker-compose.yaml
     restart: unless-stopped
     # environment:
     #   - DEPLOYMENT_DOMAIN=${DEPLOYMENT_DOMAIN}
