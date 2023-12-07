@@ -24,6 +24,7 @@ func NewWaitManager(mngrCtx *types.Context, flow *types.Flow) *WaitManager {
 		Flow:           flow}
 	return &item
 }
+
 func (man *WaitManager) StartProcessing() {
 	helpers.Log(logrus.DebugLevel, "starting WAIT...")
 	//man.ManagerContext.RecvChannel <- *item

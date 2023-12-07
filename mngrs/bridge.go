@@ -326,16 +326,19 @@ func (man *BridgeManager) StartProcessing() {
 	callType := data["call_type"].(types.ModelDataStr)
 
 	helpers.Log(logrus.DebugLevel, "processing call type: "+callType.Value)
-	if callType.Value == "Extension" || callType.Value == "Phone Number" {
-		man.startSimpleCall(callType.Value)
-
-	} else if callType.Value == "ExtensionFlow" {
-		extension := data["extension"].(types.ModelDataStr).Value
-		man.initiateExtFlow(user, extension)
-	} else if callType.Value == "Follow Me" {
-	} else if callType.Value == "Queue" {
-	} else if callType.Value == "Merge Calls" {
-		man.startCallMerge(callType.Value)
+	switch callType.Value {
+		case "Extension":
+		case "Phone Number":
+			man.startSimpleCall(callType.Value)
+		case "ExtensionFlow":
+			extension := data["extension"].(types.ModelDataStr).Value
+			man.initiateExtFlow(user, extension)
+		case "Follow Me":
+			helpers.Log(logrus.DebugLevel, "not implemented")
+		case "Queue":
+			helpers.Log(logrus.DebugLevel, "not implemented")
+		case "Merge Calls":
+			helpers.Log(logrus.DebugLevel, "not implemented")
 	}
 
 	for {
