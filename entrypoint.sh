@@ -16,4 +16,10 @@ if [[ -z "${ARI_URL}" ]]; then
     export ARI_WSURL="ws://${PROXY_HOST}:8088/ari/events"
 fi
 
+API_SCHEME="http"
+DEPLOYMENT_DOMAIN="${DEPLOYMENT_DOMAIN:-example.org}"
+if [[ -z "${API_URL}" ]]; then
+   export API_URL="${API_SCHEME}://internals.${DEPLOYMENT_DOMAIN}"
+fi
+
 ./main

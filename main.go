@@ -80,12 +80,14 @@ func main() {
 	defer cancel()
 	defer cancel2()
 	cl, err := createARIConnection(connectCtx)
-	helpers.Log(logrus.InfoLevel, "Connected to ARI")
 
 	if err != nil {
+		fmt.Printf("could not connect to ARI. error: %s", err.Error())
 		panic(err.Error())
 		return
 	}
+
+	helpers.Log(logrus.InfoLevel, "Connected to ARI")
 
 	defer cl.Close()
 

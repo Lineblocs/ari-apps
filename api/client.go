@@ -81,10 +81,14 @@ type SettingsResponse struct {
 	GoogleServiceAccountJson string `json:"google_service_account_json"`
 }
 
-var baseUrl string = "https://internals." + os.Getenv("DEPLOYMENT_DOMAIN")
+func createApiUrl( path string ) (string) {
+	//var baseUrl string = "https://internals." + os.Getenv("DEPLOYMENT_DOMAIN")
+	var baseUrl string = os.Getenv("API_URL")
+	return baseUrl + path
+}
 
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
-	url := baseUrl + path
+	url := createApiUrl( path )
 	fmt.Println("URL:>", url)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
@@ -125,7 +129,7 @@ func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
 }
 
 func SendPutRequest(path string, payload []byte) (string, error) {
-	url := baseUrl + path
+	url := createApiUrl( path )
 	fmt.Println("URL:>", url)
 
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(payload))
@@ -153,7 +157,7 @@ func SendPutRequest(path string, payload []byte) (string, error) {
 }
 
 func SendGetRequest(path string, vals map[string]string) (string, error) {
-	fullUrl := baseUrl + path + "?"
+	fullUrl := createApiUrl( path + "?" )
 
 	for k, v := range vals {
 		fullUrl = fullUrl + (k + "=" + url.QueryEscape(v)) + "&"
