@@ -325,9 +325,10 @@ func (man *BridgeManager) StartProcessing() {
 
 	callType := data["call_type"].(types.ModelDataStr)
 
-	helpers.Log(logrus.DebugLevel, "processing call type: "+callType.Value)
+	helpers.Log(logrus.DebugLevel, "BridgeManager.StartProcessing processing call type: "+callType.Value)
 	switch callType.Value {
 		case "Extension":
+			man.startSimpleCall(callType.Value)
 		case "Phone Number":
 			man.startSimpleCall(callType.Value)
 		case "ExtensionFlow":

@@ -99,18 +99,13 @@ func CreateRDB() *redis.Client {
 }
 
 func FindLinkByName(links []*types.Link, direction string, tag string) (*types.Link, error) {
-	fmt.Println("FindLinkByName called...")
 	for _, link := range links {
-		fmt.Println("FindLinkByName checking source port: " + link.Link.Source.Port)
-		fmt.Println("FindLinkByName checking target port: " + link.Link.Target.Port)
 		if direction == "source" {
-			fmt.Println("FindLinkByName checking link: " + link.Source.Cell.Name)
 			if link.Link.Source.Port == tag {
 				return link, nil
 			}
 		} else if direction == "target" {
 
-			fmt.Println("FindLinkByName checking link: " + link.Target.Cell.Name)
 			if link.Link.Target.Port == tag {
 				return link, nil
 			}
@@ -937,6 +932,7 @@ func DefaultHandler(m map[string]string) {
 }
 
 func CreateAMIClient() (*amigo.Amigo, error) {
+	helpers.Log(logrus.InfoLevel, fmt.Sprintf("logging into AMI host at %s", os.Getenv("AMI_HOST")))
 	settings := &amigo.Settings{
 		Username: os.Getenv("AMI_USER"),
 		Password: os.Getenv("AMI_PASS"),
@@ -965,11 +961,12 @@ func CreateAMIClient() (*amigo.Amigo, error) {
 	//a.SetEventChannel(c)
 
 	// Check if connected with Asterisk, will send Action "QueueSummary"
-	if a.Connected() {
-		return a,nil
-	}
+	// TODO: report errors when we can't connect to AMI
+	// if a.Connected() {
+	// 	return a,nil
+	// }
 
-	return nil,errors.New("Could not connect to AMI")
+	return a,nil
 }
 
 /*

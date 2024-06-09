@@ -17,7 +17,7 @@ type BaseManager interface {
 }
 
 func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell, runner *types.Runner) {
-	helpers.Log(logrus.DebugLevel, "processing cell type "+cell.Cell.Type)
+	helpers.Log(logrus.DebugLevel, "startProcessingFlow processing cell type "+cell.Cell.Type)
 	if runner.Cancelled {
 		helpers.Log(logrus.DebugLevel, "flow runner was cancelled - exiting")
 		return
@@ -96,13 +96,21 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Cont
 }
 
 func ProcessFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell) {
-	helpers.Log(logrus.DebugLevel, "processing cell type "+cell.Cell.Type)
+	var amiClient *amigo.Amigo
+	var err error
+
 	runner := types.Runner{Cancelled: false}
 	flow.Runners = append(flow.Runners, &runner)
-	amiClient, err := utils.CreateAMIClient()
-	if err != nil {
-		helpers.Log(logrus.ErrorLevel, "ProcessFlow error: could not create AMI client")
-		return
+	needsAMI := false
+
+	if needsAMI {
+		// TODO: fix async code around AMI client instantiation
+		amiClient, err = utils.CreateAMIClient()
+		if err != nil {
+			helpers.Log(logrus.ErrorLevel, "ProcessFlow error: could not create AMI client")
+			return
+		}
 	}
+
 	startProcessingFlow(cl, amiClient, ctx, flow, lineChannel, eventVars, cell, &runner)
 }
