@@ -87,12 +87,17 @@ func createApiUrl( path string ) (string) {
 	return baseUrl + path
 }
 
+func getLineblocsKey( ) (string) {
+	var key string = os.Getenv("LINEBLOCS_KEY")
+	return key
+}
+
 func SendHttpRequest(path string, payload []byte) (*APIResponse, error) {
 	url := createApiUrl( path )
 	fmt.Println("URL:>", url)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
-	req.Header.Set("X-Custom-Header", "myvalue")
+	req.Header.Set("X-Lineblocs-Api-Token", getLineblocsKey())
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
@@ -133,6 +138,7 @@ func SendPutRequest(path string, payload []byte) (string, error) {
 	fmt.Println("URL:>", url)
 
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(payload))
+	req.Header.Set("X-Lineblocs-Api-Token", getLineblocsKey())
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
@@ -165,6 +171,7 @@ func SendGetRequest(path string, vals map[string]string) (string, error) {
 	fmt.Println("URL:>", fullUrl)
 
 	req, err := http.NewRequest("GET", fullUrl, bytes.NewBuffer([]byte("")))
+	req.Header.Set("X-Lineblocs-Api-Token", getLineblocsKey())
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}

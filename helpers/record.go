@@ -2,6 +2,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"encoding/json"
 
 	"lineblocs.com/processor/api"
@@ -17,10 +18,12 @@ type Record struct {
 	User *types.User
 	CallId *int
 	Handle *ari.LiveRecordingHandle
+	Id string
 	Trim bool	
 }
 
 type RecordingParams struct {
+	Id int `json:"id"`
 	UserId int `json:"user_id"`
 	CallId *int `json:"call_id"`
 	Tag string `json:"tag"`
@@ -72,8 +75,10 @@ func (r *Record) createAPIResource() (string, error) {
 		fmt.Printf( "error occured: %s\r\n", err.Error() )
 		return "", err
 	}
-	_ = resp.Headers.Get("x-recording-id")
-	return id, nil
+
+	r.Id = resp.Headers.Get("x-recording-id")
+
+	return r.Id, nil
 }
 
 
@@ -127,5 +132,28 @@ func (r *Record) InitiateRecordingForChannel(channel *types.LineChannel) (string
 
 func (r *Record) Stop() {
 	r.Handle.Stop()
+
+	recordingId, err := strconv.Atoi(r.Id)
+    if err != nil {
+		fmt.Printf( "error occured while setting recording status: %s\r\n", err.Error() )
+		return
+    }
+
+	params := RecordingParams{
+		Id: recordingId,
+		Status: "completed",
+	}
+
+
+	body, err := json.Marshal( params )
+	if err != nil {
+		fmt.Printf( "error occured while setting recording status: %s\r\n", err.Error() )
+		return;
+	}
+
+	_, err = api.SendHttpRequest( "/recording/setRecordingStatus", body )
+	if err != nil {
+		fmt.Printf( "error occured while setting recording status: %s\r\n", err.Error() )
+	}
 }
 

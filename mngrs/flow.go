@@ -101,7 +101,7 @@ func ProcessFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChann
 
 	runner := types.Runner{Cancelled: false}
 	flow.Runners = append(flow.Runners, &runner)
-	needsAMI := false
+	needsAMI := true
 
 	if needsAMI {
 		// TODO: fix async code around AMI client instantiation
