@@ -80,8 +80,8 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Cont
 				helpers.Log(logrus.DebugLevel, "error receiving result from cell..")
 				return
 			}
-			helpers.Log(logrus.DebugLevel, "ended process for cell")
-			helpers.Log(logrus.DebugLevel, "moving to next..")
+			//helpers.Log(logrus.DebugLevel, "ended process for cell")
+			//helpers.Log(logrus.DebugLevel, "moving to next..")
 
 			if resp.Link == nil {
 				helpers.Log(logrus.DebugLevel, "no target found... hanging up")
