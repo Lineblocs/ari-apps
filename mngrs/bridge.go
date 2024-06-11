@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/CyCoreSystems/ari/v5/rid"
@@ -149,7 +150,7 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	}
 }
 
-func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) {
+func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChannel, lineBridge *types.LineBridge, call *types.Call, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) {
 	ctx := man.ManagerContext
 	lineChannel := ctx.Channel
 	cell := ctx.Cell
@@ -184,21 +185,41 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 			helpers.Log(logrus.DebugLevel, "exiting...")
 			lineChannel.Channel.StopRing()
 			ringTimeoutChan <- true
-			return
 		case <-endSub.Events():
-			helpers.Log(logrus.DebugLevel, "ended call..")
-			return
+			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg ended call..")
+			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg stasis end called..")
+			call.Ended = time.Now()
+			params := types.StatusParams{
+				CallId: call.CallId,
+				Ip:     utils.GetPublicIp(),
+				Status: "ended"}
+			body, err := json.Marshal(params)
+			if err != nil {
+				helpers.Log(logrus.DebugLevel, "JSON error: "+err.Error())
+				continue
+			}
+
+			_, err = api.SendHttpRequest("/call/updateCall", body)
+			if err != nil {
+				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
+				continue
+			}
+			err = utils.CreateCallDebit(call)
+			if err != nil {
+				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
+				continue
+			}
+
 		case <-rootEndSub.Events():
 			helpers.Log(logrus.DebugLevel, "root inded call..")
 			resp := types.ManagerResponse{
 				Channel: lineChannel,
 				Link:    next}
 			man.ManagerContext.RecvChannel <- &resp
-			return
-
 		}
 	}
 }
+
 
 func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType string) {
 	ctx := man.ManagerContext
@@ -270,7 +291,16 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
 		return
 	}
-	outCall, err := outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
+
+	id := resp.Headers.Get("x-call-id")
+	helpers.Log(logrus.DebugLevel, "Call ID is: "+id)
+	idAsInt, err := strconv.Atoi(id)
+
+	outCall := types.Call{
+		CallId:  idAsInt,
+		Channel: &outChannel,
+		Started: time.Now(),
+		Params:  &params}
 
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
@@ -294,7 +324,9 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 	wg1.Add(1)
 	bridge.AddChannel(channel)
 	bridge.AddChannel(&outChannel)
-	go man.manageOutboundCallLeg(&outChannel, bridge, wg1, stopChannel)
+	go man.manageOutboundCallLeg(&outChannel, bridge, &outCall, wg1, stopChannel)
+
+
 
 	wg1.Wait()
 

@@ -695,8 +695,9 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	}
 
 	helpers.Log(logrus.InfoLevel, "creating outbound call...")
-	resp, err = api.SendHttpRequest("/call/createCall", body)
-	_, err = outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
+	//resp, err = api.SendHttpRequest("/call/createCall", body)
+	//_, err = outChannel.CreateCall(resp.Headers.Get("x-call-id"), &params)
+	_, err = outChannel.CreateCall(id, &params)
 
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
@@ -708,7 +709,7 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	wg1.Add(1)
 	lineBridge.AddChannel(lineChannel)
 	lineBridge.AddChannel(&outChannel)
-	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, wg1, stopChannel)
+	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, &call, wg1, stopChannel)
 	wg1.Wait()
 
 	timeout := 30
@@ -774,7 +775,7 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types
 	}
 }
 
-func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *types.LineChannel, lineBridge *types.LineBridge, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) error {
+func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *types.LineChannel, lineBridge *types.LineBridge, call *types.Call, wg *sync.WaitGroup, ringTimeoutChan chan<- bool) error {
 
 	endSub := outboundChannel.Channel.Subscribe(ari.Events.StasisEnd)
 	defer endSub.Cancel()
@@ -805,6 +806,24 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 			lineChannel.Channel.StopRing()
 			lineChannel.Channel.Hangup()
 			//lineBridge.EndBridgeCall()
+			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg ended call..")
+			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg stasis end called..")
+			call.Ended = time.Now()
+			params := types.StatusParams{
+				CallId: call.CallId,
+				Ip:     GetPublicIp(),
+				Status: "ended"}
+			body, err := json.Marshal(params)
+			if err != nil {
+				helpers.Log(logrus.DebugLevel, "JSON error: "+err.Error())
+				continue
+			}
+
+			_, err = api.SendHttpRequest("/call/updateCall", body)
+			if err != nil {
+				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
+				continue
+			}
 		case <-destroyedSub.Events():
 			helpers.Log(logrus.DebugLevel, "channel destroyed..")
 			lineChannel.Channel.StopRing()
@@ -911,7 +930,7 @@ func ProcessSIPTrunkCall(
 	wg1.Add(1)
 	lineBridge.AddChannel(lineChannel)
 	lineBridge.AddChannel(&outChannel)
-	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, wg1, stopChannel)
+	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, &call, wg1, stopChannel)
 	wg1.Wait()
 
 	timeout := 30
@@ -982,4 +1001,8 @@ func Config(key string) string {
 		}
 	}
 	return os.Getenv(key)
+}
+
+func CreateCallDebit(callChannel *types.Call) error {
+	return nil
 }

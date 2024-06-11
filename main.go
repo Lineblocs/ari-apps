@@ -182,7 +182,7 @@ func attachDTMFListeners(channel *types.LineChannel, ctx context.Context) {
 	}
 }
 
-func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string) {
+func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string, sipCallId string) {
 	go attachDTMFListeners(lineChannel, ctx)
 	callChannel := make(chan *types.Call)
 	go attachChannelLifeCycleListeners(flow, lineChannel, ctx, callChannel)
@@ -190,6 +190,7 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 	helpers.Log(logrus.DebugLevel, "calling API to create call...")
 	helpers.Log(logrus.DebugLevel, "exten is: "+exten)
 	helpers.Log(logrus.DebugLevel, "caller ID is: "+callerId)
+	helpers.Log(logrus.DebugLevel, "SIP call id: "+sipCallId)
 	params := types.CallParams{
 		From:        callerId,
 		To:          exten,
@@ -197,7 +198,9 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 		Direction:   "inbound",
 		UserId:      flow.User.Id,
 		WorkspaceId: flow.User.Workspace.Id,
-		ChannelId:   lineChannel.Channel.ID()}
+		ChannelId:   lineChannel.Channel.ID(),
+		SIPCallId: sipCallId,
+	}
 	body, err := json.Marshal(params)
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
@@ -336,8 +339,9 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		helpers.Log(logrus.DebugLevel, "processing action: "+action)
 
 		callerId := event.Args[2]
-		fmt.Printf("Starting stasis with extension: %s, caller id: %s", exten, callerId)
-		go processIncomingCall(cl, ctx, flow, &lineChannel, exten, callerId)
+		sipCallId := event.Args[3]
+		fmt.Printf("Starting stasis with extension: %s, caller id: %s SIP call id: %s", exten, callerId, sipCallId)
+		go processIncomingCall(cl, ctx, flow, &lineChannel, exten, callerId, sipCallId)
 	case "OUTGOING_PROXY_ENDPOINT":
 
 		callerId := event.Args[2]
