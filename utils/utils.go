@@ -318,11 +318,14 @@ func sendToAssetServer(path string, filename string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to upload file, %v", err)
 	}
-	fmt.Printf("file uploaded to, %s\n", aws.StringValue(&result.Location))
+ 	
+	s3Url := aws.StringValue(&result.Location)
+	fmt.Printf("file uploaded to, %s\n", s3Url)
 
 	// send back link to media
-	url := "https://mediafs." + os.Getenv("DEPLOYMENT_DOMAIN") + "/" + key
-	return url, nil
+	//url := "https://mediafs." + os.Getenv("DEPLOYMENT_DOMAIN") + "/" + key
+	//return url, nil
+	return s3Url, nil
 }
 
 func DownloadFile(flow *types.Flow, url string) (string, error) {
@@ -381,7 +384,8 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 	}
 	var serviceAccountKey = []byte(settings.GoogleServiceAccountJson)
 
-	creds, err := google.CredentialsFromJSON(ctx, serviceAccountKey)
+	creds, err := google.CredentialsFromJSON(ctx, serviceAccountKey, "https://www.googleapis.com/auth/cloud-platform")
+
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, err.Error())
 		return "", err
@@ -449,6 +453,7 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 	}
 	fmt.Printf("Audio content written to file: %v\n", fullPathToFile)
 	link, err := sendToAssetServer(fullPathToFile, filename)
+	fmt.Printf("asset link: " + link)
 	if err != nil {
 		return "", err
 	}
