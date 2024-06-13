@@ -26,7 +26,10 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 	lineChannel := ctx.Channel
 	cell := ctx.Cell
 	flow := ctx.Flow
-	record := processor_helpers.NewRecording(flow.User, &outCall.CallId, false)
+	storageServer := types.StorageServer{
+		Ip: utils.GetARIHost(),
+	}
+	record := processor_helpers.NewRecording(&storageServer, flow.User, &outCall.CallId, false)
 	_, recordErr := record.InitiateRecordingForChannel(outboundChannel)
 
 	if recordErr != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	processor_helpers "lineblocs.com/processor/helpers"
 	"lineblocs.com/processor/types"
+	"lineblocs.com/processor/utils"
 )
 
 type RecordVoicemailManager struct {
@@ -37,7 +38,10 @@ func (man *RecordVoicemailManager) StartProcessing() {
 	if ok {
 		trim = trimData.Value
 	}
-	recording := processor_helpers.NewRecording(user, nil, trim)
+	storageServer := types.StorageServer{
+		Ip: utils.GetARIHost(),
+	}
+	recording := processor_helpers.NewRecording(&storageServer, user, nil, trim)
 	_, err := recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("recording err " + err.Error())

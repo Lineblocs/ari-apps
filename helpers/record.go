@@ -7,7 +7,6 @@ import (
 
 	"lineblocs.com/processor/api"
 	"lineblocs.com/processor/types"
-	"lineblocs.com/processor/utils"
 	"github.com/google/uuid"
 	"github.com/CyCoreSystems/ari/v5"
 )
@@ -16,6 +15,7 @@ type Record struct {
 	Bridge *types.LineBridge
 	Channel *types.LineChannel
 	User *types.User
+	StorageServer *types.StorageServer
 	CallId *int
 	Handle *ari.LiveRecordingHandle
 	Id string
@@ -35,8 +35,9 @@ type RecordingParams struct {
 }
 
 
-func NewRecording(user *types.User, callId *int, trim bool) (*Record) {
+func NewRecording(server *types.StorageServer, user *types.User, callId *int, trim bool) (*Record) {
 	record := Record{
+		StorageServer: server,
 		User: user, CallId:callId, Trim: trim }
 
 	return &record
@@ -60,7 +61,7 @@ func (r *Record) createAPIResource() (string, error) {
 		WorkspaceId: user.Workspace.Id,
 		Trim: r.Trim,
 		StorageId: id,
-		StorageServerIp: utils.GetARIHost()}
+		StorageServerIp: r.StorageServer.Ip}
 
 
 	body, err := json.Marshal( params )

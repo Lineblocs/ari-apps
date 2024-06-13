@@ -93,7 +93,10 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	flow := ctx.Flow
 	cell := ctx.Cell
 	channel := ctx.Channel
-	record := processor_helpers.NewRecording(flow.User, &flow.RootCall.CallId, false)
+	storageServer := types.StorageServer{
+		Ip: utils.GetARIHost(),
+	}
+	record := processor_helpers.NewRecording(&storageServer, flow.User, &flow.RootCall.CallId, false)
 	//_,recordErr:=record.InitiateRecordingForBridge(bridge)
 	_, recordErr := record.InitiateRecordingForBridge(bridge)
 	next, _ := utils.FindLinkByName(cell.TargetLinks, "source", "Connected Call Ended")

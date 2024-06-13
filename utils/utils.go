@@ -38,6 +38,7 @@ import (
 	texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
 	"lineblocs.com/processor/api"
 	"lineblocs.com/processor/types"
+	processor_helpers "lineblocs.com/processor/helpers"
 )
 
 var log *logrus.Logger
@@ -692,7 +693,7 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	outChannel.Channel = outboundChannel
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go manageBridge(lineBridge, &call, lineChannel, &outChannel, wg)
+	go manageBridge(lineBridge, &call, user, lineChannel, &outChannel, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
 		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
@@ -726,7 +727,7 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	return nil
 }
 
-func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types.LineChannel, outboundChannel *types.LineChannel, wg *sync.WaitGroup) {
+func manageBridge(bridge *types.LineBridge, call *types.Call, user *types.User, lineChannel *types.LineChannel, outboundChannel *types.LineChannel, wg *sync.WaitGroup) {
 	h := bridge.Bridge
 
 	helpers.Log(logrus.DebugLevel, "manageBridge called..")
@@ -744,6 +745,18 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types
 
 	wg.Done()
 	helpers.Log(logrus.DebugLevel, "listening for bridge events...")
+
+	storageServer := types.StorageServer{
+		Ip: GetARIHost(),
+	}
+	record := processor_helpers.NewRecording(&storageServer, user, &call.CallId, false)
+	//_,recordErr:=record.InitiateRecordingForBridge(bridge)
+	_, recordErr := record.InitiateRecordingForBridge(bridge)
+	if recordErr != nil {
+		helpers.Log(logrus.ErrorLevel, "error starting recording: "+recordErr.Error())
+		return
+	}
+
 	var numChannelsEntered int = 0
 	for {
 		select {
@@ -773,6 +786,7 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, lineChannel *types
 			// end both calls
 			lineChannel.SafeHangup()
 			outboundChannel.SafeHangup()
+			record.Stop()
 
 			helpers.Log(logrus.DebugLevel, "updating call status...")
 			api.UpdateCall(call, "ended")
@@ -914,7 +928,7 @@ func ProcessSIPTrunkCall(
 	outChannel.Channel = outboundChannel
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go manageBridge(lineBridge, &call, lineChannel, &outChannel, wg)
+	go manageBridge(lineBridge, &call, user, lineChannel, &outChannel, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
 		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
