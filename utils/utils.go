@@ -625,7 +625,7 @@ func GetConfBridge(client ari.Client, user *types.User, confName string) (*types
 }
 
 func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string, addedHeaders *[]string) error {
-	helpers.Log(logrus.DebugLevel, "ensureBridge called..")
+	helpers.Log(logrus.DebugLevel, "StartOutboundCall called..")
 	var bridge *ari.BridgeHandle
 	var err error
 
