@@ -74,16 +74,25 @@ func (channel *LineChannel) StartWaitingForRingTimeout(ctx *Context, noAnswer *L
 			fmt.Println("bridge in session. stopping ring timeout")
 			return
 		case <-ringCtx.Done():
-			fmt.Println("Ring timeout elapsed.. ending all calls")
-			if mode == "dial" {
-				resp := ManagerResponse{
-					Channel: channel,
-					Link:    noAnswer}
-				ctx.RecvChannel <- &resp
-			} else {
-				channel.SafeHangup()
+			if !channel.UseRingTimeout {
+				fmt.Println("Ring timeout elasped but timeout was disabled.. will not terminate call.")
+				return
 			}
+
+			fmt.Println("Ring timeout elapsed.. closing channel")
+			channel.handleRingTimeout(ctx, noAnswer, "dial")
 			return
 		}
+	}
+}
+
+func (channel *LineChannel) handleRingTimeout(ctx *Context, noAnswer *Link, mode string) {
+	if mode == "dial" {
+		resp := ManagerResponse{
+			Channel: channel,
+			Link:    noAnswer}
+		ctx.RecvChannel <- &resp
+	} else {
+		channel.SafeHangup()
 	}
 }
