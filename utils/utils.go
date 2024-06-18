@@ -624,7 +624,7 @@ func GetConfBridge(client ari.Client, user *types.User, confName string) (*types
 	return conf, nil
 }
 
-func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string, addedHeaders *[]string) error {
+func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChannel *types.LineChannel, callerId string, numberToCall string, typeOfCall string, addedHeaders *[]string) error {
 	helpers.Log(logrus.DebugLevel, "ensureBridge called..")
 	var bridge *ari.BridgeHandle
 	var err error
@@ -636,7 +636,7 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 		return eris.Wrap(err, "failed to create bridge")
 	}
 	outChannel := types.LineChannel{}
-	lineBridge := types.NewBridge(bridge)
+	lineBridge := types.NewBridge(bridge, false)
 
 	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 	outboundChannel, err := cl.Channel().Create(nil, CreateChannelRequest(numberToCall))
@@ -693,7 +693,7 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	outChannel.Channel = outboundChannel
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go manageBridge(lineBridge, &call, user, lineChannel, &outChannel, wg)
+	go manageBridge(&lineBridge, &call, user, lineChannel, &outChannel, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
 		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
@@ -715,10 +715,11 @@ func EnsureBridge(cl ari.Client, src *ari.Key, user *types.User, lineChannel *ty
 	wg1.Add(1)
 	lineBridge.AddChannel(lineChannel)
 	lineBridge.AddChannel(&outChannel)
-	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, &call, wg1, stopChannel)
+	go manageOutboundCallLeg(lineChannel, &outChannel, &lineBridge, &call, wg1, stopChannel)
 	wg1.Wait()
 
-	timeout := 30
+	//
+	timeout := 90
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
 	go lineBridge.StartWaitingForRingTimeout(timeout, wg2, stopChannel)
@@ -871,7 +872,7 @@ func ProcessSIPTrunkCall(
 		return eris.Wrap(err, "failed to create bridge")
 	}
 	outChannel := types.LineChannel{}
-	lineBridge := types.NewBridge(bridge)
+	lineBridge := types.NewBridge(bridge, false)
 
 	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 	outboundChannel, err := cl.Channel().Create(nil, CreateChannelRequest(exten))
@@ -928,7 +929,7 @@ func ProcessSIPTrunkCall(
 	outChannel.Channel = outboundChannel
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go manageBridge(lineBridge, &call, user, lineChannel, &outChannel, wg)
+	go manageBridge(&lineBridge, &call, user, lineChannel, &outChannel, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
 		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
@@ -949,7 +950,7 @@ func ProcessSIPTrunkCall(
 	wg1.Add(1)
 	lineBridge.AddChannel(lineChannel)
 	lineBridge.AddChannel(&outChannel)
-	go manageOutboundCallLeg(lineChannel, &outChannel, lineBridge, &call, wg1, stopChannel)
+	go manageOutboundCallLeg(lineChannel, &outChannel, &lineBridge, &call, wg1, stopChannel)
 	wg1.Wait()
 
 	timeout := 30

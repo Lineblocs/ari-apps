@@ -111,7 +111,8 @@ func findCellInFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 	cell := Cell{ Channel: channel, Cell: cellToFind, EventVars: make( map[string]string ) }
 	if cellToFind.Type == "devs.DialModel" || cellToFind.Type == "devs.BridgeModel" || cellToFind.Type == "devs.ConferenceModel" {
 		// empty holder channel
-		cell.CellChannel = &LineChannel{}
+ 		channel := NewChannel(nil, true)
+		cell.CellChannel = &channel
 	}
 	return &cell
 }

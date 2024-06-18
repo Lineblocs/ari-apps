@@ -14,13 +14,16 @@ type LineBridge struct {
 	Bridge             *ari.BridgeHandle
 	AutomateLegAHangup bool
 	AutomateLegBHangup bool
+	UseRingTimeout bool
 	Channels           []*LineChannel
 	ChannelsToAdd      []*LineChannel
 }
 
-func NewBridge(bridge *ari.BridgeHandle) *LineBridge {
-	value := LineBridge{Bridge: bridge, Channels: make([]*LineChannel, 0)}
-	return &value
+func NewBridge(bridge *ari.BridgeHandle, useRingTimeout bool) LineBridge {
+	return LineBridge{
+		Bridge: bridge, 
+		Channels: make([]*LineChannel, 0), 
+		UseRingTimeout: useRingTimeout}
 }
 
 func (b *LineBridge) EndBridgeCall() {
@@ -62,6 +65,11 @@ func (b *LineBridge) StartWaitingForRingTimeout(timeout int, wg *sync.WaitGroup,
 			fmt.Println("bridge in session. stopping ring timeout")
 			return
 		case <-ringCtx.Done():
+			fmt.Println("Ring timeout elapsed.. ending all calls")
+			if !b.UseRingTimeout {
+				fmt.Println("Ring timeout elasped but timeout was disabled.. will not terminate call.")
+				return
+			}
 			fmt.Println("Ring timeout elapsed.. ending all calls")
 			b.EndBridgeCall()
 			return

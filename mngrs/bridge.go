@@ -41,12 +41,12 @@ func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) error {
 		return eris.Wrap(err, "failed to create bridge")
 	}
 
-	lineBridge := types.NewBridge(bridge)
+	lineBridge := types.NewBridge(bridge, true)
 	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go man.manageBridge(lineBridge, wg, callType)
+	go man.manageBridge(&lineBridge, wg, callType)
 	wg.Wait()
 	if err := bridge.AddChannel(ctx.Channel.Channel.Key().ID); err != nil {
 		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge, error:"+err.Error())
@@ -54,8 +54,8 @@ func (man *BridgeManager) ensureBridge(src *ari.Key, callType string) error {
 	}
 
 	helpers.Log(logrus.InfoLevel, "channel added to bridge")
-	man.addAllRequestedCalls(lineBridge)
-	go man.startOutboundCall(lineBridge, callType)
+	man.addAllRequestedCalls(&lineBridge)
+	go man.startOutboundCall(&lineBridge, callType)
 
 	return nil
 }
@@ -82,7 +82,7 @@ func (man *BridgeManager) addAllRequestedCalls(bridge *types.LineBridge) {
 
 			key := ari.NewKey(ari.ChannelKey, call.ChannelId)
 			channel := ctx.Client.Channel().Get(key)
-			reqChannel := types.LineChannel{Channel: channel}
+			reqChannel := types.NewChannel(channel, true)
 			bridge.AddChannel(&reqChannel)
 		}
 	}
@@ -255,7 +255,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 	helpers.Log(logrus.DebugLevel, "Calling: "+numberToCall)
 
 	timeout := utils.ParseRingTimeout(model.Data["timeout"])
-	outChannel := types.LineChannel{}
+	outChannel := types.NewChannel(nil, true)
 	outboundChannel, err := ctx.Client.Channel().Create(nil, utils.CreateChannelRequest(numberToCall))
 
 	if err != nil {
@@ -432,13 +432,13 @@ func (man *BridgeManager) startCallMerge(callType string) {
 		return
 	}
 
-	lineBridge := types.NewBridge(bridge)
+	lineBridge := types.NewBridge(bridge, true)
 	helpers.Log(logrus.InfoLevel, "channel added to bridge")
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go man.manageBridge(lineBridge, wg, callType)
+	go man.manageBridge(&lineBridge, wg, callType)
 	wg.Wait()
 
-	man.addAllRequestedCalls(lineBridge)
+	man.addAllRequestedCalls(&lineBridge)
 }

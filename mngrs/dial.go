@@ -111,7 +111,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	timeout := utils.ParseRingTimeout(model.Data["timeout"])
 
-	outChannel := types.LineChannel{}
+	outChannel := types.NewChannel(nil, true)
 	outboundChannel, err := ctx.Client.Channel().Create(nil, utils.CreateChannelRequest(numberToCall))
 
 	if err != nil {

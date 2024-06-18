@@ -14,8 +14,15 @@ import (
 type LineChannel struct {
 	Channel          *ari.ChannelHandle
 	LineBridge       *LineBridge
+	UseRingTimeout bool
 	currentCellIndex int
 	dtmfPressed      string
+}
+
+func NewChannel(channel *ari.ChannelHandle, useRingTimeout bool) LineChannel {
+	return LineChannel{
+		Channel: channel, 
+		UseRingTimeout: useRingTimeout}
 }
 
 func (channel *LineChannel) RemoveFromBridge() {

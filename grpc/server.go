@@ -38,9 +38,9 @@ func (s *Server) lookupBridge(bridgeId string) (*types.LineBridge, error) {
 
 func (s *Server) lookupChannel(channelId string) (*types.LineChannel, error) {
 	src := ari.NewKey(ari.ChannelKey, channelId)
-	channel := s.Client.Channel().Get(src)
+	channel := types.NewChannel(s.Client.Channel().Get(src), true)
 
-	return &types.LineChannel{Channel: channel}, nil
+	return &channel, nil
 }
 
 func (s *Server) lookupRecording(recordingId string) (*helpers.Record, error) {
@@ -335,7 +335,7 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 
 	timeout := utils.ParseRingTimeout(req.Timeout)
 
-	outChannel := types.LineChannel{}
+	outChannel := types.NewChannel(nil, true)
 	outboundChannel, err := s.Client.Channel().Create(nil, utils.CreateChannelRequest(numberToCall))
 
 	if err != nil {

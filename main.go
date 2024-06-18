@@ -263,8 +263,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		exten := event.Args[1]
 		callerId := event.Args[2]
 		trunkAddr := event.Args[3]
-		lineChannel := types.LineChannel{
-			Channel: h}
+		lineChannel := types.NewChannel(h, true)
 		lineChannel.Answer()
 
 		resp, err := api.GetUserByDID(exten)
@@ -325,8 +324,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 			return
 		}
 
-		lineChannel := types.LineChannel{
-			Channel: h}
+		lineChannel := types.NewChannel(h, true)
 		user := types.NewUser(data.CreatorId, data.WorkspaceId, data.WorkspaceName)
 		flow := types.NewFlow(
 			data.FlowId,
@@ -347,8 +345,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		callerId := event.Args[2]
 		domain := event.Args[3]
 
-		lineChannel := types.LineChannel{
-			Channel: h}
+		lineChannel := types.NewChannel(h, true)
 
 		helpers.Log(logrus.DebugLevel, "looking up domain: "+domain)
 		resp, err := api.GetUserByDomain(domain)
@@ -363,7 +360,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		fmt.Printf("Received call from %s, domain: %s\r\n", callerId, domain)
 		fmt.Printf("Calling %s\r\n", exten)
 		lineChannel.Answer()
-		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension", nil)
+		err = utils.StartOutboundCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension", nil)
 		if err != nil {
 			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
@@ -376,8 +373,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 
 		helpers.Log(logrus.DebugLevel, "channel key: "+h.Key().ID)
 
-		lineChannel := types.LineChannel{
-			Channel: h}
+		lineChannel := types.NewChannel(h, true)
 		resp, err := api.GetUserByDomain(domain)
 
 		if err != nil {
@@ -397,7 +393,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		}
 		fmt.Printf("setup caller id: " + callerInfo.CallerId)
 		lineChannel.Answer()
-		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn", nil)
+		err = utils.StartOutboundCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn", nil)
 		if err != nil {
 			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
@@ -411,8 +407,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		trunkSourceIp := event.Args[3]
 		helpers.Log(logrus.DebugLevel, "channel key: "+h.Key().ID)
 
-		lineChannel := types.LineChannel{
-			Channel: h}
+		lineChannel := types.NewChannel(h, true)
 		resp, err := api.GetUserByTrunkSourceIp(trunkSourceIp)
 
 		if err != nil {
@@ -427,7 +422,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		lineChannel.Answer()
 		headers := make([]string, 0)
 		headers = append(headers, "X-Lineblocs-User-SIP-Trunk-Calling-PSTN: true")
-		err = utils.EnsureBridge(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn", &headers)
+		err = utils.StartOutboundCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn", &headers)
 		if err != nil {
 			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
 			return
