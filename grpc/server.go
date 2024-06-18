@@ -387,7 +387,7 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 	outChannel.Channel = outboundChannel
 	stopChannel := make(chan bool, 1)
 	go s.manageCall(call, &outChannel, clientId, stopChannel)
-	go outChannel.StartWaitingForRingTimeout(nil, nil, timeout, nil, stopChannel, "server")
+	go outChannel.StartRingTimer(nil, nil, timeout, nil, stopChannel, "server")
 	reply := CallReply{
 		ChannelId: outChannel.Channel.ID(),
 		CallId:    strconv.Itoa(call.CallId)}

@@ -58,7 +58,7 @@ func (channel *LineChannel) CreateCall(id string, params *CallParams) (*Call, er
 	return &call, nil
 }
 
-func (channel *LineChannel) StartWaitingForRingTimeout(ctx *Context, noAnswer *Link, timeout int, wg *sync.WaitGroup, ringTimeoutChan <-chan bool, mode string) {
+func (channel *LineChannel) StartRingTimer(ctx *Context, noAnswer *Link, timeout int, wg *sync.WaitGroup, ringTimeoutChan <-chan bool, mode string) {
 	duration := time.Now().Add(time.Duration(timeout) * time.Second)
 
 	// Create a context that is both manually cancellable and will signal

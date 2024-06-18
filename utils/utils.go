@@ -722,7 +722,7 @@ func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChanne
 	timeout := 90
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
-	go lineBridge.StartWaitingForRingTimeout(timeout, wg2, stopChannel)
+	go lineBridge.StartRingTimer(timeout, wg2, stopChannel)
 	wg2.Wait()
 
 	return nil
@@ -956,7 +956,7 @@ func ProcessSIPTrunkCall(
 	timeout := 30
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
-	go lineBridge.StartWaitingForRingTimeout(timeout, wg2, stopChannel)
+	go lineBridge.StartRingTimer(timeout, wg2, stopChannel)
 	wg2.Wait()
 
 	return nil

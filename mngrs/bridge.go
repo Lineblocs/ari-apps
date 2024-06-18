@@ -335,7 +335,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
-	go bridge.StartWaitingForRingTimeout(timeout, wg2, stopChannel)
+	go bridge.StartRingTimer(timeout, wg2, stopChannel)
 	wg2.Wait()
 }
 

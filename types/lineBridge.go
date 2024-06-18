@@ -49,7 +49,7 @@ func (b *LineBridge) RemoveChannel(channel *LineChannel) {
 	b.Channels = channels
 }
 
-func (b *LineBridge) StartWaitingForRingTimeout(timeout int, wg *sync.WaitGroup, ringTimeoutChan <-chan bool) {
+func (b *LineBridge) StartRingTimer(timeout int, wg *sync.WaitGroup, ringTimeoutChan <-chan bool) {
 	fmt.Println("starting ring timeout checker..")
 	fmt.Println("timeout set for: " + strconv.Itoa(timeout))
 	duration := time.Now().Add(time.Duration(timeout) * time.Second)

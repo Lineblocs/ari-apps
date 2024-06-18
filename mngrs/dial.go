@@ -172,7 +172,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
 	noAnswer, _ := utils.FindLinkByName(cell.SourceLinks, "source", "No Answer")
-	go outChannel.StartWaitingForRingTimeout(ctx, noAnswer, timeout, wg2, stopChannel, "dial")
+	go outChannel.StartRingTimer(ctx, noAnswer, timeout, wg2, stopChannel, "dial")
 	wg2.Wait()
 }
 
