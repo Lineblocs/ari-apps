@@ -1,5 +1,9 @@
 package grpc;
 
+import (
+	"github.com/confluentinc/confluent-kafka-go/kafka"
+)
+
 
 type ClientEvent struct {
 	ClientId string `json:"client_id"`
@@ -12,6 +16,7 @@ type EventRegistry struct {
 }
 
 var wsEventStreams = []*EventRegistry{}
+var kafkaEventProducer *kafka.Producer
 
 func createWSChan(id string) (chan *ClientEvent) {
 	wsChan := make( chan *ClientEvent )
@@ -29,4 +34,8 @@ func lookupWSChan(id string) (chan *ClientEvent) {
 		}
 	}
 	return nil
+}
+
+func getProducer() (*kafka.Producer) {
+	return kafkaEventProducer
 }

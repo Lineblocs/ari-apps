@@ -8,6 +8,7 @@ import (
 
 	"github.com/CyCoreSystems/ari/v5"
 	"github.com/ivahaev/amigo"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 type Context struct {
@@ -19,6 +20,7 @@ type Context struct {
 	Context     context.Context
 	Client      ari.Client
 	AMIClient   *amigo.Amigo
+	EventProducer  *kafka.Producer
 	RecvChannel chan<- *ManagerResponse
 }
 
@@ -78,7 +80,7 @@ func processAllInterpolations(data map[string]ModelData, lineFlow *Flow) {
 		processInterpolation(&val, lineFlow)
 	}
 }
-func NewContext(cl ari.Client, amiClient *amigo.Amigo, ctx context.Context, recvChannel chan<- *ManagerResponse, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) *Context {
+func NewContext(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.Producer, ctx context.Context, recvChannel chan<- *ManagerResponse, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) *Context {
 	processAllInterpolations(cell.Model.Data, flow)
 	return &Context{
 		Client: cl, 
@@ -89,5 +91,6 @@ func NewContext(cl ari.Client, amiClient *amigo.Amigo, ctx context.Context, recv
 		Flow: flow, 
 		Runner: runner, 
 		RecvChannel: recvChannel,
+		EventProducer: producer,
 	}
 }

@@ -36,6 +36,7 @@ import (
 	"google.golang.org/api/option"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"lineblocs.com/processor/api"
 	"lineblocs.com/processor/types"
 	processor_helpers "lineblocs.com/processor/helpers"
@@ -278,6 +279,21 @@ func CreateSIPHeadersForSIPTrunkCall(domain, callerId, typeOfCall, apiCallId str
 	headers["SIPADDHEADER5"] = "X-Lineblocs-User-SIP-Trunk-Addr: " + trunkAddr
 	headers["SIPADDHEADER6"] = "X-Lineblocs-User-SIP-Trunk: true"
 	return headers
+}
+
+func CreateKafkaProducer() (*kafka.Producer, error) {
+	servers := os.Getenv("KAFKA_SERVER_ENDPOINTS")
+	clientId := "lineblocs-call-processor"
+	p, err := kafka.NewProducer(&kafka.ConfigMap{
+		"bootstrap.servers": servers,
+		"client.id": clientId,
+		"acks": "all"})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 func sendToAssetServer(path string, filename string) (string, error) {
@@ -646,6 +662,13 @@ func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChanne
 		return err
 	}
 
+	// create kafka producer
+	producer, err := CreateKafkaProducer()
+	if err != nil {
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		return err
+	}
+
 	helpers.Log(logrus.DebugLevel, "Originating call...")
 
 	params := types.CallParams{
@@ -693,7 +716,7 @@ func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChanne
 	outChannel.Channel = outboundChannel
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go manageBridge(&lineBridge, &call, user, lineChannel, &outChannel, wg)
+	go manageBridge(&lineBridge, &call, user, lineChannel, &outChannel, producer, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
 		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())
@@ -728,7 +751,7 @@ func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChanne
 	return nil
 }
 
-func manageBridge(bridge *types.LineBridge, call *types.Call, user *types.User, lineChannel *types.LineChannel, outboundChannel *types.LineChannel, wg *sync.WaitGroup) {
+func manageBridge(bridge *types.LineBridge, call *types.Call, user *types.User, lineChannel *types.LineChannel, outboundChannel *types.LineChannel, producer *kafka.Producer, wg *sync.WaitGroup) {
 	h := bridge.Bridge
 
 	helpers.Log(logrus.DebugLevel, "manageBridge called..")
@@ -750,7 +773,8 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, user *types.User, 
 	storageServer := types.StorageServer{
 		Ip: GetARIHost(),
 	}
-	record := processor_helpers.NewRecording(&storageServer, user, &call.CallId, false)
+
+	record := processor_helpers.NewRecording(&storageServer, producer, user, &call.CallId, false)
 	//_,recordErr:=record.InitiateRecordingForBridge(bridge)
 	_, recordErr := record.InitiateRecordingForBridge(bridge)
 	if recordErr != nil {
@@ -925,11 +949,18 @@ func ProcessSIPTrunkCall(
 		return err
 	}
 
+	// create kafka producer
+	producer, err := CreateKafkaProducer()
+	if err != nil {
+		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		return err
+	}
+
 	stopChannel := make(chan bool)
 	outChannel.Channel = outboundChannel
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	go manageBridge(&lineBridge, &call, user, lineChannel, &outChannel, wg)
+	go manageBridge(&lineBridge, &call, user, lineChannel, &outChannel, producer, wg)
 	wg.Wait()
 	if err := bridge.AddChannel(lineChannel.Channel.Key().ID); err != nil {
 		helpers.Log(logrus.ErrorLevel, "failed to add channel to bridge"+" error:"+err.Error())

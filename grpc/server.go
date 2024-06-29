@@ -701,7 +701,8 @@ func (s *Server) ChannelRecord(ctx context.Context, req *GenericChannelReq) (*Ge
 		Ip: utils.GetARIHost(),
 	}
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording(&storageServer, user, nil, false)
+	producer := getProducer()
+	recording := helpers.NewRecording(&storageServer, producer, user, nil, false)
 	id, err := recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
@@ -832,7 +833,8 @@ func (s *Server) BridgeRecord(ctx context.Context, req *GenericBridgeReq) (*Gene
 		Ip: utils.GetARIHost(),
 	}
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording(&storageServer,user, nil, false)
+	producer := getProducer()
+	recording := helpers.NewRecording(&storageServer,producer, user, nil, false)
 	id, err := recording.InitiateRecordingForBridge(bridge)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
@@ -985,7 +987,8 @@ func (s *Server) RecordingStop(ctx context.Context, req *RecordingRequest) (*Rec
 		Ip: utils.GetARIHost(),
 	}
 	user := types.NewUser(userIdInt, workspace, workspaceName)
-	recording := helpers.NewRecording(&storageServer, user, nil, false)
+	producer := getProducer()
+	recording := helpers.NewRecording(&storageServer, producer, user, nil, false)
 	go recording.Stop()
 	s.dispatchEvent(func() {
 		// send to channel

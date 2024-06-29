@@ -27,8 +27,10 @@ func NewRecordVoicemailManager(mngrCtx *types.Context, flow *types.Flow) *Record
 }
 func (man *RecordVoicemailManager) StartProcessing() {
 	helpers.Log(logrus.DebugLevel, "Creating bridge... ")
-	cell := man.ManagerContext.Cell
-	flow := man.ManagerContext.Flow
+	ctx := man.ManagerContext
+
+	cell := ctx.Cell
+	flow := ctx.Flow
 	channel := cell.CellChannel
 	user := flow.User
 	data := cell.Model.Data
@@ -41,7 +43,8 @@ func (man *RecordVoicemailManager) StartProcessing() {
 	storageServer := types.StorageServer{
 		Ip: utils.GetARIHost(),
 	}
-	recording := processor_helpers.NewRecording(&storageServer, user, nil, trim)
+	producer := ctx.EventProducer
+	recording := processor_helpers.NewRecording(&storageServer, producer, user, nil, trim)
 	_, err := recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("recording err " + err.Error())

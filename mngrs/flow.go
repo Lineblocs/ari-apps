@@ -8,6 +8,8 @@ import (
 	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
 	"github.com/ivahaev/amigo"
+
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
@@ -16,7 +18,7 @@ type BaseManager interface {
 	StartProcessing()
 }
 
-func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell, runner *types.Runner) {
+func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.Producer, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell, runner *types.Runner) {
 	helpers.Log(logrus.DebugLevel, "startProcessingFlow processing cell type "+cell.Cell.Type)
 	if runner.Cancelled {
 		helpers.Log(logrus.DebugLevel, "flow runner was cancelled - exiting")
@@ -29,6 +31,7 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Cont
 	lineCtx := types.NewContext(
 		cl,
 		amiClient,
+		producer,
 		ctx,
 		manRecvChannel,
 		flow,
@@ -40,7 +43,7 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Cont
 	switch cell.Cell.Type {
 	case "devs.LaunchModel":
 		for _, link := range cell.SourceLinks {
-			go startProcessingFlow(cl, amiClient, ctx, flow, lineChannel, eventVars, link.Target, runner)
+			go startProcessingFlow(cl, amiClient, producer, ctx, flow, lineChannel, eventVars, link.Target, runner)
 		}
 		return
 	case "devs.SwitchModel":
@@ -89,7 +92,7 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Cont
 				return
 			}
 			next := resp.Link
-			defer startProcessingFlow(cl, amiClient, ctx, flow, resp.Channel, eventVars, next.Target, runner)
+			defer startProcessingFlow(cl, amiClient, producer, ctx, flow, resp.Channel, eventVars, next.Target, runner)
 			return
 		}
 	}
@@ -97,11 +100,13 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, ctx context.Cont
 
 func ProcessFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell) {
 	var amiClient *amigo.Amigo
+	var producer *kafka.Producer
 	var err error
 
 	runner := types.Runner{Cancelled: false}
 	flow.Runners = append(flow.Runners, &runner)
 	needsAMI := true
+	needsProducer := false
 
 	if needsAMI {
 		// TODO: fix async code around AMI client instantiation
@@ -111,6 +116,14 @@ func ProcessFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChann
 			return
 		}
 	}
+	if needsProducer {
+		// TODO: fix async code around AMI client instantiation
+		producer, err = utils.CreateKafkaProducer()
+		if err != nil {
+			helpers.Log(logrus.ErrorLevel, "ProcessFlow error: could not create Kafka producer")
+			return
+		}
+	}
 
-	startProcessingFlow(cl, amiClient, ctx, flow, lineChannel, eventVars, cell, &runner)
+	startProcessingFlow(cl, amiClient, producer, ctx, flow, lineChannel, eventVars, cell, &runner)
 }

@@ -2,6 +2,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"encoding/json"
 
@@ -9,6 +10,7 @@ import (
 	"lineblocs.com/processor/types"
 	"github.com/google/uuid"
 	"github.com/CyCoreSystems/ari/v5"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 type Record struct {
@@ -18,6 +20,7 @@ type Record struct {
 	StorageServer *types.StorageServer
 	CallId *int
 	Handle *ari.LiveRecordingHandle
+	EventProducer *kafka.Producer
 	Id string
 	Trim bool	
 }
@@ -35,10 +38,14 @@ type RecordingParams struct {
 }
 
 
-func NewRecording(server *types.StorageServer, user *types.User, callId *int, trim bool) (*Record) {
+func NewRecording(server *types.StorageServer, producer *kafka.Producer, user *types.User, callId *int, trim bool) (*Record) {
 	record := Record{
 		StorageServer: server,
-		User: user, CallId:callId, Trim: trim }
+		User: user, 
+		CallId:callId, 
+		Trim: trim,
+		EventProducer: producer,
+	 }
 
 	return &record
 }
@@ -140,6 +147,8 @@ func (r *Record) Stop() {
 		return
     }
 
+	producer := r.EventProducer
+
 	params := RecordingParams{
 		Id: recordingId,
 		Status: "completed",
@@ -155,6 +164,31 @@ func (r *Record) Stop() {
 	_, err = api.SendHttpRequest( "/recording/setRecordingStatus", body )
 	if err != nil {
 		fmt.Printf( "error occured while setting recording status: %s\r\n", err.Error() )
+	}
+
+	// generate an event to notify other services that recording is ready for processing
+	if producer != nil {
+		fmt.Println( "notifying all services that recording is complete and ready for further processing" )
+		topic := os.Getenv("KAFKA_RECORDINGS_TOPIC")
+		recordingData := struct {
+			RecordingId  int `json:"id"`
+			Status string `json:"status"`
+		}{
+			RecordingId: recordingId,
+			Status: "complete",
+		}
+
+		// Marshal the struct into JSON
+		recordingMsg, err := json.Marshal(recordingData)
+		if err != nil {
+			fmt.Println("Error marshalling JSON:", err)
+			return
+		}
+		err = producer.Produce(&kafka.Message{
+			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+			Value: []byte(recordingMsg)},
+			nil, // delivery channel
+		)
 	}
 }
 
