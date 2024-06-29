@@ -283,7 +283,12 @@ func CreateSIPHeadersForSIPTrunkCall(domain, callerId, typeOfCall, apiCallId str
 
 func CreateKafkaProducer() (*kafka.Producer, error) {
 	servers := os.Getenv("KAFKA_SERVER_ENDPOINTS")
+	producerEnabled := false
 	clientId := "lineblocs-call-processor"
+	if !producerEnabled {
+		return nil, nil
+	}
+
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": servers,
 		"client.id": clientId,
