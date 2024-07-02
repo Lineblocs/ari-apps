@@ -308,8 +308,9 @@ func sendToAssetServer(path string, filename string) (string, error) {
 	}
 
 	creds := credentials.NewStaticCredentials(
-		settings.AwsAccessKeyId,
-		settings.AwsSecretAccessKey, "")
+		settings.Credentials["aws_access_key_id"],
+		settings.Credentials["aws_secret_access_key"],
+		"")
 
 	sess, err := session.NewSession(&aws.Config{
 		Region:      aws.String(settings.AwsRegion),
@@ -404,7 +405,7 @@ func StartTTS(say string, gender string, voice string, lang string) (string, err
 	if err != nil {
 		return "", err
 	}
-	var serviceAccountKey = []byte(settings.GoogleServiceAccountJson)
+	var serviceAccountKey = []byte(settings.Credentials["google_service_account_json"])
 
 	creds, err := google.CredentialsFromJSON(ctx, serviceAccountKey, "https://www.googleapis.com/auth/cloud-platform")
 
@@ -489,7 +490,7 @@ func StartSTT(fileURI string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var serviceAccountKey = []byte(settings.GoogleServiceAccountJson)
+	var serviceAccountKey = []byte(settings.Credentials["google_service_account_json"])
 
 	creds, err := google.CredentialsFromJSON(ctx, serviceAccountKey)
 	if err != nil {
