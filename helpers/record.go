@@ -21,6 +21,7 @@ type Record struct {
 	CallId *int
 	Handle *ari.LiveRecordingHandle
 	EventProducer *kafka.Producer
+	StorageId string
 	Id string
 	Trim bool	
 }
@@ -85,6 +86,7 @@ func (r *Record) createAPIResource() (string, error) {
 	}
 
 	r.Id = resp.Headers.Get("x-recording-id")
+	r.StorageId = params.StorageId
 
 	return r.Id, nil
 }
@@ -171,11 +173,17 @@ func (r *Record) Stop() {
 		fmt.Println( "notifying all services that recording is complete and ready for further processing" )
 		topic := os.Getenv("KAFKA_RECORDINGS_TOPIC")
 		recordingData := struct {
-			RecordingId  int `json:"id"`
-			Status string `json:"status"`
+			RecordingId int    `json:"id"`
+			StorageId string `json:"storage_id"`
+			StorageServerIp string `json:"storage_server_ip"`
+			Trim bool `json:"trim"`
+			Status      string `json:"status"`
 		}{
 			RecordingId: recordingId,
 			Status: "complete",
+			StorageId: r.StorageId,
+			StorageServerIp: r.StorageServer.Ip,
+			Trim: r.Trim,
 		}
 
 		// Marshal the struct into JSON

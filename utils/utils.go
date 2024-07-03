@@ -313,7 +313,7 @@ func sendToAssetServer(path string, filename string) (string, error) {
 		"")
 
 	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(settings.AwsRegion),
+		Region:      aws.String(settings.Credentials["aws_region"]),
 		Credentials: creds,
 	})
 	if err != nil {
