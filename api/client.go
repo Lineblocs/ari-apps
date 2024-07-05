@@ -65,7 +65,7 @@ type ConferenceResponse struct {
 }
 
 type SettingsResponse struct {
-	Credentials map[string]string
+	Credentials map[string]string `json:"credentials"`
 }
 
 func createApiUrl( path string ) (string) {
