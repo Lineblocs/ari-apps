@@ -124,8 +124,6 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 	helpers.Log(logrus.DebugLevel, "listening for bridge events...")
 	for {
 		select {
-		case <-ctx.Context.Done():
-			return
 		case <-destroySub.Events():
 			helpers.Log(logrus.DebugLevel, "bridge destroyed")
 			return
@@ -381,13 +379,8 @@ func (man *BridgeManager) StartProcessing() {
 			helpers.Log(logrus.DebugLevel, "not implemented")
 		case "Merge Calls":
 			helpers.Log(logrus.DebugLevel, "not implemented")
-	}
-
-	for {
-		select {
-		case <-man.ManagerContext.Context.Done():
-			return
-		}
+		default:
+			helpers.Log(logrus.DebugLevel, callType.Value + " call type not implplemented")
 	}
 }
 func (man *BridgeManager) startSimpleCall(callType string) {
@@ -419,7 +412,7 @@ func (man *BridgeManager) initiateExtFlow(user *types.User, extension string) {
 		client)
 
 	vars := make(map[string]string)
-	go ProcessFlow(client, man.ManagerContext.Context, flow, channel, vars, flow.Cells[0])
+	go ProcessFlow(client, flow, channel, vars, flow.Cells[0])
 }
 
 func (man *BridgeManager) startCallMerge(callType string) {

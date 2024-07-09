@@ -1,7 +1,6 @@
 package types
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -17,7 +16,6 @@ type Context struct {
 	Channel     *LineChannel
 	Runner      *Runner
 	Vars        *FlowVars
-	Context     context.Context
 	Client      ari.Client
 	AMIClient   *amigo.Amigo
 	EventProducer  *kafka.Producer
@@ -80,12 +78,11 @@ func processAllInterpolations(data map[string]ModelData, lineFlow *Flow) {
 		processInterpolation(&val, lineFlow)
 	}
 }
-func NewContext(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.Producer, ctx context.Context, recvChannel chan<- *ManagerResponse, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) *Context {
+func NewContext(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.Producer, recvChannel chan<- *ManagerResponse, flow *Flow, cell *Cell, runner *Runner, channel *LineChannel) *Context {
 	processAllInterpolations(cell.Model.Data, flow)
 	return &Context{
 		Client: cl, 
 		AMIClient: amiClient,
-		Context: ctx, 
 		Channel: channel, 
 		Cell: cell, 
 		Flow: flow, 

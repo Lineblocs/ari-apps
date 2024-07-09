@@ -86,7 +86,6 @@ func (man *InputManager) StartProcessing() {
 
 func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int, stopGatherOnKeypress bool, keypressKeyStop string, wg *sync.WaitGroup, stopChannel chan<- bool) {
 	channel := man.ManagerContext.Channel
-	ctx := man.ManagerContext.Context
 	helpers.Log(logrus.DebugLevel, "listening for DTMF..")
 	dtmfSub := channel.Channel.Subscribe(ari.Events.ChannelDtmfReceived)
 	defer dtmfSub.Cancel()
@@ -98,8 +97,6 @@ func (man *InputManager) attachDtmfListeners(stopTimeout float64, maxDigits int,
 	for {
 
 		select {
-		case <-ctx.Done():
-			return
 		case e, ok := <-dtmfSub.Events():
 
 			if !ok {

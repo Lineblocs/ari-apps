@@ -615,8 +615,7 @@ func (s *Server) ChannelStartFlow(ctx context.Context, req *ChannelStartFlowWidg
 		s.Client)
 
 	vars := make(map[string]string)
-	flowCtx, _ := context.WithCancel(context.Background())
-	go mngrs.ProcessFlow(s.Client, flowCtx, flow, channel, vars, flow.Cells[0])
+	go mngrs.ProcessFlow(s.Client, flow, channel, vars, flow.Cells[0])
 	resp := ChannelStartFlowWidgetReply{}
 	return &resp, nil
 }

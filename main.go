@@ -67,18 +67,10 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
 	return cl, err
 }
 
-func main() {
-	// OPTIONAL: setup logging
-	//native.Logger = log
-	// Init Logrus and configure channels
-	logDestination := utils.Config("LOG_DESTINATIONS")
-	helpers.InitLogrus(logDestination)
-
+func startProcessingWSEvents() {
 	helpers.Log(logrus.InfoLevel, "Connecting")
-	ctx, cancel := context.WithCancel(context.Background())
-	connectCtx, cancel2 := context.WithCancel(context.Background())
+	connectCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	defer cancel2()
 	cl, err := createARIConnection(connectCtx)
 
 	if err != nil {
@@ -101,18 +93,33 @@ func main() {
 	sub := cl.Bus().Subscribe(nil, "StasisStart")
 
 	for {
-		select {
-		case e := <-sub.Events():
-			v := e.(*ari.StasisStart)
-			helpers.Log(logrus.InfoLevel, "Got stasis start"+" channel "+v.Channel.ID)
-			go startExecution(cl, v, ctx, cl.Channel().Get(v.Key(ari.ChannelKey, v.Channel.ID)))
-		case <-ctx.Done():
-			return
-		case <-connectCtx.Done():
+		if !cl.Connected() {
+			helpers.Log(logrus.ErrorLevel, "websocket was disconnected. reconnecting now.")
 			cl.Close()
+			startProcessingWSEvents()
 			return
 		}
+
+		select {
+			case e := <-sub.Events():
+				v := e.(*ari.StasisStart)
+				helpers.Log(logrus.InfoLevel, "Got stasis start"+" channel "+v.Channel.ID)
+				go startExecution(cl, v, cl.Channel().Get(v.Key(ari.ChannelKey, v.Channel.ID)))
+			case <-connectCtx.Done():
+				cl.Close()
+				return
+			}
 	}
+}
+
+func main() {
+	// OPTIONAL: setup logging
+	//native.Logger = log
+	// Init Logrus and configure channels
+	logDestination := utils.Config("LOG_DESTINATIONS")
+	helpers.InitLogrus(logDestination)
+
+	startProcessingWSEvents()
 }
 
 type bridgeManager struct {
@@ -125,7 +132,7 @@ func createCall() (types.Call, error) {
 func createCallDebit(user *types.User, call *types.Call, direction string) error {
 	return nil
 }
-func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChannel, ctx context.Context, callChannel chan *types.Call) {
+func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChannel, callChannel chan *types.Call) {
 	var call *types.Call
 	endSub := channel.Channel.Subscribe(ari.Events.StasisEnd)
 	defer endSub.Cancel()
@@ -135,8 +142,6 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 	for {
 
 		select {
-		case <-ctx.Done():
-			return
 		case <-endSub.Events():
 			helpers.Log(logrus.DebugLevel, "stasis end called..")
 			call.Ended = time.Now()
@@ -167,25 +172,23 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 		}
 	}
 }
-func attachDTMFListeners(channel *types.LineChannel, ctx context.Context) {
+func attachDTMFListeners(channel *types.LineChannel) {
 	dtmfSub := channel.Channel.Subscribe(ari.Events.ChannelDtmfReceived)
 	defer dtmfSub.Cancel()
 
 	for {
 
 		select {
-		case <-ctx.Done():
-			return
 		case <-dtmfSub.Events():
 			helpers.Log(logrus.DebugLevel, "received DTMF!")
 		}
 	}
 }
 
-func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string, sipCallId string) {
-	go attachDTMFListeners(lineChannel, ctx)
+func processIncomingCall(cl ari.Client, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string, sipCallId string) {
+	go attachDTMFListeners(lineChannel)
 	callChannel := make(chan *types.Call)
-	go attachChannelLifeCycleListeners(flow, lineChannel, ctx, callChannel)
+	go attachChannelLifeCycleListeners(flow, lineChannel, callChannel)
 
 	helpers.Log(logrus.DebugLevel, "calling API to create call...")
 	helpers.Log(logrus.DebugLevel, "exten is: "+exten)
@@ -228,17 +231,13 @@ func processIncomingCall(cl ari.Client, ctx context.Context, flow *types.Flow, l
 	helpers.Log(logrus.DebugLevel, "answering call..")
 	lineChannel.Answer()
 	vars := make(map[string]string)
-	go mngrs.ProcessFlow(cl, ctx, flow, lineChannel, vars, flow.Cells[0])
+	go mngrs.ProcessFlow(cl, flow, lineChannel, vars, flow.Cells[0])
 	callChannel <- &call
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		}
-	}
 }
 
-func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, h *ari.ChannelHandle) {
+func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle) {
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
 	helpers.Log(logrus.InfoLevel, "running app"+" channel "+h.Key().ID)
 
 	action := event.Args[0]
@@ -339,7 +338,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, ctx context.Context, 
 		callerId := event.Args[2]
 		sipCallId := event.Args[3]
 		fmt.Printf("Starting stasis with extension: %s, caller id: %s SIP call id: %s", exten, callerId, sipCallId)
-		go processIncomingCall(cl, ctx, flow, &lineChannel, exten, callerId, sipCallId)
+		go processIncomingCall(cl, flow, &lineChannel, exten, callerId, sipCallId)
 	case "OUTGOING_PROXY_ENDPOINT":
 
 		callerId := event.Args[2]

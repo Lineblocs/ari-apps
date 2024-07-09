@@ -1,7 +1,6 @@
 package mngrs
 
 import (
-	"context"
 	"strconv"
 
 	"github.com/CyCoreSystems/ari/v5"
@@ -18,7 +17,7 @@ type BaseManager interface {
 	StartProcessing()
 }
 
-func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.Producer, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell, runner *types.Runner) {
+func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.Producer, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell, runner *types.Runner) {
 	helpers.Log(logrus.DebugLevel, "startProcessingFlow processing cell type "+cell.Cell.Type)
 	if runner.Cancelled {
 		helpers.Log(logrus.DebugLevel, "flow runner was cancelled - exiting")
@@ -32,7 +31,6 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.
 		cl,
 		amiClient,
 		producer,
-		ctx,
 		manRecvChannel,
 		flow,
 		cell,
@@ -43,7 +41,7 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.
 	switch cell.Cell.Type {
 	case "devs.LaunchModel":
 		for _, link := range cell.SourceLinks {
-			go startProcessingFlow(cl, amiClient, producer, ctx, flow, lineChannel, eventVars, link.Target, runner)
+			go startProcessingFlow(cl, amiClient, producer, flow, lineChannel, eventVars, link.Target, runner)
 		}
 		return
 	case "devs.SwitchModel":
@@ -92,13 +90,13 @@ func startProcessingFlow(cl ari.Client, amiClient *amigo.Amigo, producer *kafka.
 				return
 			}
 			next := resp.Link
-			defer startProcessingFlow(cl, amiClient, producer, ctx, flow, resp.Channel, eventVars, next.Target, runner)
+			defer startProcessingFlow(cl, amiClient, producer, flow, resp.Channel, eventVars, next.Target, runner)
 			return
 		}
 	}
 }
 
-func ProcessFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell) {
+func ProcessFlow(cl ari.Client, flow *types.Flow, lineChannel *types.LineChannel, eventVars map[string]string, cell *types.Cell) {
 	var amiClient *amigo.Amigo
 	var producer *kafka.Producer
 	var err error
@@ -125,5 +123,5 @@ func ProcessFlow(cl ari.Client, ctx context.Context, flow *types.Flow, lineChann
 		}
 	}
 
-	startProcessingFlow(cl, amiClient, producer, ctx, flow, lineChannel, eventVars, cell, &runner)
+	startProcessingFlow(cl, amiClient, producer, flow, lineChannel, eventVars, cell, &runner)
 }
