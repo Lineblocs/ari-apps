@@ -172,6 +172,9 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 	rootEndSub := lineChannel.Channel.Subscribe(ari.Events.StasisEnd)
 	defer rootEndSub.Cancel()
 
+	destroySub := lineBridge.Bridge.Subscribe(ari.Events.BridgeDestroyed)
+	defer destroySub.Cancel()
+
 	wg.Done()
 	helpers.Log(logrus.DebugLevel, "listening for channel events...")
 
@@ -189,9 +192,8 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 			helpers.Log(logrus.DebugLevel, "exiting...")
 			lineChannel.Channel.StopRing()
 			ringTimeoutChan <- true
-		case <-endSub.Events():
-			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg ended call..")
-			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg stasis end called..")
+		case <-destroySub.Events():
+			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg bridge destroyed")
 			call.Ended = time.Now()
 			params := types.StatusParams{
 				CallId: call.CallId,
@@ -213,7 +215,10 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
 				continue
 			}
-
+			return
+		case <-endSub.Events():
+			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg ended call..")
+			helpers.Log(logrus.DebugLevel, "manageOutboundCallLeg stasis end called..")
 		case <-rootEndSub.Events():
 			helpers.Log(logrus.DebugLevel, "root inded call..")
 			resp := types.ManagerResponse{
