@@ -196,14 +196,7 @@ func CreateChannelRequest(numberToCall string) ari.ChannelCreateRequest {
 	return ari.ChannelCreateRequest{
 		Endpoint: "SIP/" + numberToCall + "@" + GetSIPProxy(),
 		App:      "lineblocs",
-		AppArgs:  "DID_DIAL,"}
-}
-
-func CreateChannelRequest2(numberToCall string) ari.ChannelCreateRequest {
-	return ari.ChannelCreateRequest{
-		Endpoint: "SIP/" + numberToCall + "/" + GetSIPProxy(),
-		App:      "lineblocs",
-		AppArgs:  "DID_DIAL_2,"}
+		AppArgs:  "PROCESSED_CALL,"}
 }
 
 func CreateOriginateRequest(callerId string, numberToCall string, headers map[string]string) ari.OriginateRequest {
@@ -211,7 +204,7 @@ func CreateOriginateRequest(callerId string, numberToCall string, headers map[st
 		CallerID: callerId,
 		Endpoint: "SIP/" + numberToCall + "@" + GetSIPProxy(),
 		App:      "lineblocs",
-		AppArgs:  "DID_DIAL,", Variables: headers}
+		AppArgs:  "PROCESSED_CALL,", Variables: headers}
 }
 
 func CreateOriginateRequest2(callerId string, numberToCall string) ari.OriginateRequest {
@@ -219,7 +212,7 @@ func CreateOriginateRequest2(callerId string, numberToCall string) ari.Originate
 		CallerID: callerId,
 		Endpoint: "SIP/" + numberToCall + "/" + GetSIPProxy(),
 		App:      "lineblocs",
-		AppArgs:  "DID_DIAL_2,"}
+		AppArgs:  "PROCESSED_CALL_2,"}
 }
 
 func DetermineNumberToCall(data map[string]types.ModelData) (string, error) {

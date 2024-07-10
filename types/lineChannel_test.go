@@ -29,7 +29,7 @@ func NewMockChannel(cl ari.Client) *ari.ChannelHandle {
 	channelRequest := ari.ChannelCreateRequest{
 		Endpoint: "SIP/" + "80011972598400495" + "@159.89.124.168",
 		App:      "lineblocs",
-		AppArgs:  "DID_DIAL,"}
+		AppArgs:  "PROCESSED_CALL,"}
 	outboundChannel, _ := cl.Channel().Create(nil, channelRequest)
 	return outboundChannel
 

@@ -251,12 +251,9 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 	switch action {
 	case "h":
 		fmt.Println("Received h handler - not processing")
-	case "DID_DIAL":
+	case "PROCESSED_CALL":
 		fmt.Println("Already dialed - not processing")
 		return
-	case "DID_DIAL_2":
-
-		fmt.Println("Already dialed - not processing")
 	case "INCOMING_SIP_TRUNK":
 		//domain := data.Domain
 		exten := event.Args[1]
