@@ -182,9 +182,6 @@ func LookupCellVariable(flow *types.Flow, name string, lookup string) (string, e
 
 // TODO call API to get proxy IPs
 func GetSIPProxy() string {
-	//return "proxy1";
-	//return "52.60.126.237"
-	//return "159.89.124.168"
 	return os.Getenv("PROXY_HOST")
 }
 
