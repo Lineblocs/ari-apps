@@ -329,6 +329,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 			}
 		}
 
+		fmt.Printf("got %d models in data\r\n", len(flowJson.Models))
 		body, err = api.SendGetRequest("/user/getWorkspaceMacros", vals)
 
 		if err != nil {

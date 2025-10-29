@@ -119,12 +119,14 @@ func findCellInFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 }
 	
 func createCellData(cell *Cell, flow *Flow, channel *LineChannel) {
+	fmt.Printf("creating cell data for %s\r\n", cell.Cell.Id)
 	var model Model = Model{
 		Id: "",
 		Data: make(map[string] ModelData) }
 	sourceLinks := make( []*Link, 0 )
 	targetLinks := make( []*Link, 0 )
 	for _, item := range flow.Vars.Models {
+		fmt.Printf("comparing cell %s with %s\r\n", item.Id, cell.Cell.Id)
 		if (item.Id == cell.Cell.Id) {
 			//unparsedModel := item
 			var modelData map[string]interface{}
@@ -158,6 +160,7 @@ func createCellData(cell *Cell, flow *Flow, channel *LineChannel) {
 						//item.ValueStr = v.(string)
 						//item.IsStr = true
 						value := v.(string)
+						fmt.Printf("adding %s to struct with value %s", key, value)
 						model.Data[key]=ModelDataStr{Value: value}
 					case "boolean":
 						// it's something else
@@ -206,7 +209,7 @@ func addCellToFlow(id string, flow *Flow, channel *LineChannel) (*Cell) {
 
 	cellInFlow := findCellInFlow(id, flow, channel)
 
-	fmt.Printf("adding cell %s", cellInFlow.Cell.Id)
+	fmt.Printf("addCellToFlow: adding cell %s type %s\r\n", cellInFlow.Cell.Id, cellInFlow.Cell.Type)
 	flow.Cells = append(flow.Cells, cellInFlow)
 	createCellData(cellInFlow, flow, channel)
 	return cellInFlow

@@ -4,6 +4,7 @@ package resources
 // call flow for an unconfigured DID (Direct Inward Dialing) number. This acts as 
 // a "warning" or placeholder flow until a user-defined flow is set.
 // We use a raw string literal (`...`) to avoid escaping double quotes within the JSON.
+
 const DIDFlowUnconfiguredJSON = `{
   "graph": {
     "cells": [
@@ -235,27 +236,27 @@ const DIDFlowUnconfiguredJSON = `{
           }
         }
       }
-    ],
-    "models": [
-      {
-        "id": "63a1a711-9e56-441e-9388-f4bbc6d2b400",
-        "name": "Launch",
-        "data": {},
-        "links": []
-      },
-      {
-        "id": "ce811673-46c8-4bb8-9eaf-a28152c90bde",
-        "name": "Playback",
-        "data": {
-          "playback_type": "Say",
-          "text_to_say": "This number hasn't been configured yet.",
-          "text_language": "en-US",
-          "text_gender": "FEMALE",
-          "voice": "en-US-Standard-C",
-          "number_of_loops": "1"
-        },
-        "links": []
-      }
     ]
-  }
+  },
+  "models": [
+    {
+      "id": "63a1a711-9e56-441e-9388-f4bbc6d2b400",
+      "name": "Launch",
+      "data": {},
+      "links": []
+    },
+    {
+      "id": "ce811673-46c8-4bb8-9eaf-a28152c90bde",
+      "name": "Playback",
+      "data": {
+        "playback_type": "Say",
+        "text_to_say": "This number hasn't been configured yet.",
+        "text_language": "en-US",
+        "text_gender": "FEMALE",
+        "voice": "en-US-Standard-C",
+        "number_of_loops": "1"
+      },
+      "links": []
+    }
+  ]
 }`
