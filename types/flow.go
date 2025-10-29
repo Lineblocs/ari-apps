@@ -89,6 +89,7 @@ type FlowDIDData struct {
 	CreatorId int `json:"creator_id"`
 	FlowJson string `json:"flow_json"`
 	Plan string `json:"plan"`
+	CreationIntent string `json:"creation_intent"`
 }
 type SIPTrunkData struct {
 	//FlowJson FlowVars `json:"flow_json"`

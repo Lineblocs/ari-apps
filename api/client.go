@@ -33,6 +33,7 @@ type DomainResponse struct {
 type FlowResponse struct {
 	FlowId   int    `json:"flow_id"`
 	FlowJson string `json:"flow_json"`
+	CreationIntent string `json:"creation_intent"`
 }
 
 type SubFlow struct {

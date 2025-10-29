@@ -18,7 +18,7 @@ import (
 	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/rotisserie/eris"
 	"lineblocs.com/processor/api"
-	processor_helpers "lineblocs.com/processor/helpers"
+	"lineblocs.com/processor/resources"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
@@ -97,7 +97,7 @@ func (man *BridgeManager) manageBridge(bridge *types.LineBridge, wg *sync.WaitGr
 		Ip: utils.GetARIHost(),
 	}
 	producer := ctx.EventProducer
-	record := processor_helpers.NewRecording(&storageServer, producer, flow.User, &flow.RootCall.CallId, false)
+	record := resources.NewRecording(&storageServer, producer, flow.User, &flow.RootCall.CallId, false)
 	//_,recordErr:=record.InitiateRecordingForBridge(bridge)
 	_, recordErr := record.InitiateRecordingForBridge(bridge)
 	next, _ := utils.FindLinkByName(cell.TargetLinks, "source", "Connected Call Ended")

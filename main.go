@@ -22,11 +22,13 @@ import (
 	"lineblocs.com/processor/mngrs"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
+	"lineblocs.com/processor/resources"
 )
 
 var ariApp = "lineblocs"
 
 var bridge *ari.BridgeHandle
+
 
 type APIResponse struct {
 	Headers http.Header
@@ -301,10 +303,30 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 			helpers.Log(logrus.DebugLevel, fmt.Sprintf("msg = %s", logger.FREE_TRIAL_ENDED))
 			return
 		}
-		err = json.Unmarshal([]byte(data.FlowJson), &flowJson)
-		if err != nil {
-			helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
-			return
+
+		// Corrected and cleaner Go switch case
+		switch {
+		case data.FlowJson == "" && data.CreationIntent == "CREATED_WITH_DID_PURCHASE":
+			// This case handles the original 'if' block: Do nothing and continue.
+			// The code block is intentionally empty, just like the original 'if' block.
+			err = json.Unmarshal([]byte(resources.DIDFlowUnconfiguredJSON), &flowJson)
+			if err != nil {
+				helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
+				return
+			}
+		default:
+			// The 'default' case handles the original 'else' block. 
+			// It runs if the 'case' condition above is FALSE, meaning:
+			// (data.FlowJson != "" || data.CreationIntent != "CREATED_WITH_DID_PURCHASE")
+			
+			// We only need data.FlowJson != "" for the Unmarshal, but the logic 
+			// must be the inverse of the 'case' above to be a true replacement for the 'else'.
+			
+			err = json.Unmarshal([]byte(data.FlowJson), &flowJson)
+			if err != nil {
+				helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
+				return
+			}
 		}
 
 		body, err = api.SendGetRequest("/user/getWorkspaceMacros", vals)

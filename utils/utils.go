@@ -39,7 +39,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"lineblocs.com/processor/api"
 	"lineblocs.com/processor/types"
-	processor_helpers "lineblocs.com/processor/helpers"
+	"lineblocs.com/processor/resources"
 )
 
 var log *logrus.Logger
@@ -770,7 +770,7 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, user *types.User, 
 		Ip: GetARIHost(),
 	}
 
-	record := processor_helpers.NewRecording(&storageServer, producer, user, &call.CallId, false)
+	record := resources.NewRecording(&storageServer, producer, user, &call.CallId, false)
 	//_,recordErr:=record.InitiateRecordingForBridge(bridge)
 	_, recordErr := record.InitiateRecordingForBridge(bridge)
 	if recordErr != nil {

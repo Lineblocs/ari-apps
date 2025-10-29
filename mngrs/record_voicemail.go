@@ -8,7 +8,7 @@ import (
 
 	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
-	processor_helpers "lineblocs.com/processor/helpers"
+	"lineblocs.com/processor/resources"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
@@ -44,7 +44,7 @@ func (man *RecordVoicemailManager) StartProcessing() {
 		Ip: utils.GetARIHost(),
 	}
 	producer := ctx.EventProducer
-	recording := processor_helpers.NewRecording(&storageServer, producer, user, nil, trim)
+	recording := resources.NewRecording(&storageServer, producer, user, nil, trim)
 	_, err := recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("recording err " + err.Error())

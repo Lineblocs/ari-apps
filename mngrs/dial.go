@@ -11,7 +11,7 @@ import (
 	helpers "github.com/Lineblocs/go-helpers"
 	"github.com/sirupsen/logrus"
 	"lineblocs.com/processor/api"
-	processor_helpers "lineblocs.com/processor/helpers"
+	"lineblocs.com/processor/resources"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
 )
@@ -30,7 +30,7 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 		Ip: utils.GetARIHost(),
 	}
 	producer := ctx.EventProducer
-	record := processor_helpers.NewRecording(&storageServer, producer, flow.User, &outCall.CallId, false)
+	record := resources.NewRecording(&storageServer, producer, flow.User, &outCall.CallId, false)
 	_, recordErr := record.InitiateRecordingForChannel(outboundChannel)
 
 	if recordErr != nil {

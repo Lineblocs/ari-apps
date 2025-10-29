@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	status "google.golang.org/grpc/status"
 	"lineblocs.com/processor/api"
-	"lineblocs.com/processor/helpers"
+	"lineblocs.com/processor/resources"
 	"lineblocs.com/processor/mngrs"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
@@ -43,11 +43,11 @@ func (s *Server) lookupChannel(channelId string) (*types.LineChannel, error) {
 	return &channel, nil
 }
 
-func (s *Server) lookupRecording(recordingId string) (*helpers.Record, error) {
+func (s *Server) lookupRecording(recordingId string) (*resources.Record, error) {
 	src := ari.NewKey(ari.LiveRecordingKey, recordingId)
 	rec := s.Client.LiveRecording().Get(src)
 
-	return &helpers.Record{Handle: rec}, nil
+	return &resources.Record{Handle: rec}, nil
 }
 func (s *Server) safeSendToWS(clientid string, evt *ClientEvent) {
 	wsChan := lookupWSChan(clientid)
@@ -701,7 +701,7 @@ func (s *Server) ChannelRecord(ctx context.Context, req *GenericChannelReq) (*Ge
 	}
 	user := types.NewUser(userIdInt, workspace, workspaceName)
 	producer := getProducer()
-	recording := helpers.NewRecording(&storageServer, producer, user, nil, false)
+	recording := resources.NewRecording(&storageServer, producer, user, nil, false)
 	id, err := recording.InitiateRecordingForChannel(channel)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
@@ -833,7 +833,7 @@ func (s *Server) BridgeRecord(ctx context.Context, req *GenericBridgeReq) (*Gene
 	}
 	user := types.NewUser(userIdInt, workspace, workspaceName)
 	producer := getProducer()
-	recording := helpers.NewRecording(&storageServer,producer, user, nil, false)
+	recording := resources.NewRecording(&storageServer,producer, user, nil, false)
 	id, err := recording.InitiateRecordingForBridge(bridge)
 	if err != nil {
 		fmt.Println("startExecution err " + err.Error())
@@ -987,7 +987,7 @@ func (s *Server) RecordingStop(ctx context.Context, req *RecordingRequest) (*Rec
 	}
 	user := types.NewUser(userIdInt, workspace, workspaceName)
 	producer := getProducer()
-	recording := helpers.NewRecording(&storageServer, producer, user, nil, false)
+	recording := resources.NewRecording(&storageServer, producer, user, nil, false)
 	go recording.Stop()
 	s.dispatchEvent(func() {
 		// send to channel

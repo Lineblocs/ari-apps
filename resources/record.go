@@ -1,4 +1,4 @@
-package helpers
+package resources
 import (
 	"context"
 	"fmt"
