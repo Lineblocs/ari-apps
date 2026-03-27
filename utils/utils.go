@@ -729,6 +729,7 @@ func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChanne
 		return err
 	}
 
+	enforceRingTimeout := false
 	lineChannel.Channel.Ring()
 	wg1 := new(sync.WaitGroup)
 	wg1.Add(1)
@@ -737,7 +738,11 @@ func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChanne
 	go manageOutboundCallLeg(lineChannel, &outChannel, &lineBridge, &call, wg1, stopChannel)
 	wg1.Wait()
 
-	//
+
+	if !enforceRingTimeout {
+		return nil
+	}
+
 	timeout := 90
 	wg2 := new(sync.WaitGroup)
 	wg2.Add(1)
