@@ -162,10 +162,10 @@ func LookupCellVariable(flow *types.Flow, name string, lookup string) (string, e
 			return cell.EventVars["dial_status"], nil
 		} else if lookup == "channel.id" {
 			return cell.EventVars["channelId"], nil
-		} else if lookup == "started" {
+		} else if lookup == "STARTED" {
 			call := cell.AttachedCall
 			return strconv.Itoa(call.GetStartTime()), nil
-		} else if lookup == "ended" {
+		} else if lookup == "ENDED" {
 			call := cell.AttachedCall
 			return strconv.Itoa(call.FigureOutEndedTime()), nil
 		}
@@ -857,7 +857,7 @@ func manageOutboundCallLeg(lineChannel *types.LineChannel, outboundChannel *type
 			params := types.StatusParams{
 				CallId: call.CallId,
 				Ip:     GetPublicIp(),
-				Status: "ended"}
+				Status: "ENDED"}
 			body, err := json.Marshal(params)
 			if err != nil {
 				helpers.Log(logrus.DebugLevel, "JSON error: "+err.Error())
