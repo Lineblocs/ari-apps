@@ -133,8 +133,8 @@ func TestCreateCall(t *testing.T) {
 	params := CallParams{
 		From:        "123123234",
 		To:          "80011972598400495",
-		Status:      "start",
-		Direction:   "outbound",
+		Status:      "STARTED",
+		Direction:   "OUTBOUND",
 		UserId:      2,
 		WorkspaceId: 3,
 		ChannelId:   "test-channel"}

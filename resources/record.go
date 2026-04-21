@@ -65,7 +65,7 @@ func (r *Record) createAPIResource() (string, error) {
 		UserId: user.Id,
 		CallId:callId,
 		Tag: "",
-		Status: "started",
+		Status: "RECORDING",
 		WorkspaceId: user.Workspace.Id,
 		Trim: r.Trim,
 		StorageId: id,

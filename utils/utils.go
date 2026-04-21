@@ -670,8 +670,8 @@ func StartOutboundCall(cl ari.Client, src *ari.Key, user *types.User, lineChanne
 	params := types.CallParams{
 		From:        callerId,
 		To:          numberToCall,
-		Status:      "start",
-		Direction:   "outbound",
+		Status:      "STARTED",
+		Direction:   "OUTBOUND",
 		UserId:      user.Id,
 		WorkspaceId: user.Workspace.Id,
 		ChannelId:   outboundChannel.ID()}
@@ -912,8 +912,8 @@ func ProcessSIPTrunkCall(
 	params := types.CallParams{
 		From:        callerId,
 		To:          exten,
-		Status:      "start",
-		Direction:   "inbound",
+		Status:      "STARTED",
+		Direction:   "INBOUND",
 		UserId:      user.Id,
 		WorkspaceId: user.Workspace.Id,
 		ChannelId:   outboundChannel.ID()}

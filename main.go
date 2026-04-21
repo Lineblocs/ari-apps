@@ -162,7 +162,7 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
 				continue
 			}
-			err = createCallDebit(flow.User, call, "incoming")
+			err = createCallDebit(flow.User, call, "INBOUND")
 			if err != nil {
 				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
 				continue
