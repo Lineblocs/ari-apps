@@ -150,7 +150,7 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 			params := types.StatusParams{
 				CallId: call.CallId,
 				Ip:     utils.GetPublicIp(),
-				Status: "ended"}
+				Status: "ENDED"}
 			body, err := json.Marshal(params)
 			if err != nil {
 				helpers.Log(logrus.DebugLevel, "JSON error: "+err.Error())
@@ -199,8 +199,8 @@ func processIncomingCall(cl ari.Client, flow *types.Flow, lineChannel *types.Lin
 	params := types.CallParams{
 		From:        callerId,
 		To:          exten,
-		Status:      "start",
-		Direction:   "inbound",
+		Status:      "STARTED",
+		Direction:   "INBOUND",
 		UserId:      flow.User.Id,
 		WorkspaceId: flow.User.Workspace.Id,
 		ChannelId:   lineChannel.Channel.ID(),

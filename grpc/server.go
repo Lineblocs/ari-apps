@@ -356,8 +356,8 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 	params := types.CallParams{
 		From:        callerId,
 		To:          numberToCall,
-		Status:      "start",
-		Direction:   "outbound",
+		Status:      "STARTED",
+		Direction:   "OUTBOUND",
 		UserId:      user,
 		WorkspaceId: workspace,
 		ChannelId:   outboundChannel.ID()}

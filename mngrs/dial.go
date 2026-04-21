@@ -134,8 +134,8 @@ func (man *DialManager) startOutboundCall(callType string) {
 	params := types.CallParams{
 		From:        callerId,
 		To:          numberToCall,
-		Status:      "start",
-		Direction:   "outbound",
+		Status:      "STARTED",
+		Direction:   "OUTBOUND",
 		UserId:      flow.User.Id,
 		WorkspaceId: flow.User.Workspace.Id,
 		ChannelId:   outboundChannel.ID()}

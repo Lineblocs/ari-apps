@@ -815,7 +815,7 @@ func manageBridge(bridge *types.LineBridge, call *types.Call, user *types.User, 
 			record.Stop()
 
 			helpers.Log(logrus.DebugLevel, "updating call status...")
-			api.UpdateCall(call, "ended")
+			api.UpdateCall(call, "ENDED")
 		}
 	}
 }

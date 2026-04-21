@@ -196,7 +196,7 @@ func (man *BridgeManager) manageOutboundCallLeg(outboundChannel *types.LineChann
 			params := types.StatusParams{
 				CallId: call.CallId,
 				Ip:     utils.GetPublicIp(),
-				Status: "ended"}
+				Status: "ENDED"}
 			body, err := json.Marshal(params)
 			if err != nil {
 				helpers.Log(logrus.DebugLevel, "JSON error: "+err.Error())
@@ -280,8 +280,8 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 	params := types.CallParams{
 		From:        callerId,
 		To:          numberToCall,
-		Status:      "start",
-		Direction:   "outbound",
+		Status:      "STARTED",
+		Direction:   "OUTBOUND",
 		UserId:      flow.User.Id,
 		WorkspaceId: flow.User.Workspace.Id,
 		ChannelId:   outboundChannel.ID()}
