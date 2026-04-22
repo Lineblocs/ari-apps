@@ -153,7 +153,7 @@ func (r *Record) Stop() {
 
 	params := RecordingParams{
 		Id: recordingId,
-		Status: "completed",
+		Status: "COMPLETED",
 	}
 
 
