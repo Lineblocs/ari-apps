@@ -277,6 +277,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 		err = utils.ProcessSIPTrunkCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, trunkAddr)
 		if err != nil {
 			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
+			lineChannel.SafeHangup()
 			return
 
 		}
@@ -382,6 +383,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 		err = utils.StartOutboundCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "extension", nil)
 		if err != nil {
 			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
+			lineChannel.SafeHangup()
 			return
 
 		}
@@ -415,6 +417,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 		err = utils.StartOutboundCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerInfo.CallerId, exten, "pstn", nil)
 		if err != nil {
 			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
+			lineChannel.SafeHangup()
 			return
 
 		}
@@ -444,6 +447,7 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 		err = utils.StartOutboundCall(cl, lineChannel.Channel.Key(), user, &lineChannel, callerId, exten, "pstn", &headers)
 		if err != nil {
 			helpers.Log(logrus.DebugLevel, "could not create bridge. error: "+err.Error())
+			lineChannel.SafeHangup()
 			return
 
 		}

@@ -268,6 +268,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 
 	if err != nil {
 		helpers.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
+		bridge.EndBridgeCall()
 		return
 	}
 
@@ -292,6 +293,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 	body, err := json.Marshal(params)
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		bridge.EndBridgeCall()
 		return
 	}
 
@@ -300,6 +302,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		bridge.EndBridgeCall()
 		return
 	}
 
@@ -315,6 +318,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		bridge.EndBridgeCall()
 		return
 	}
 
@@ -324,6 +328,7 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		bridge.EndBridgeCall()
 		return
 	}
 	outChannel.Channel = outboundChannel
