@@ -340,17 +340,20 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 
 	if err != nil {
 		fmt.Println("error creating outbound channel: " + err.Error())
+		outboundChannel.Hangup()
 		return nil, err
 	}
 	user, err := strconv.Atoi(userId)
 	if err != nil {
 		fmt.Println("error occured: " + err.Error())
+		outboundChannel.Hangup()
 		return nil, err
 	}
 
 	workspace, err := strconv.Atoi(workspaceId)
 	if err != nil {
 		fmt.Println("error occured: " + err.Error())
+		outboundChannel.Hangup()
 		return nil, err
 	}
 	params := types.CallParams{
@@ -364,6 +367,7 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 	body, err := json.Marshal(params)
 	if err != nil {
 		fmt.Println("error occured: " + err.Error())
+		outboundChannel.Hangup()
 		return nil, err
 	}
 
@@ -373,6 +377,7 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 
 	if err != nil {
 		fmt.Println("error occured: " + err.Error())
+		outboundChannel.Hangup()
 		return nil, err
 	}
 	callType := req.CallType
@@ -382,6 +387,7 @@ func (s *Server) CreateCall(ctx context.Context, req *CallRequest) (*CallReply, 
 
 	if err != nil {
 		fmt.Println("error occured: " + err.Error())
+		outboundChannel.Hangup()
 		return nil, err
 	}
 	outChannel.Channel = outboundChannel

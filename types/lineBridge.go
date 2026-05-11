@@ -29,7 +29,7 @@ func NewBridge(bridge *ari.BridgeHandle, useRingTimeout bool) LineBridge {
 func (b *LineBridge) EndBridgeCall() {
 	for _, item := range b.Channels {
 		if item != nil {
-			item.Channel.Hangup()
+			item.SafeHangup()
 		}
 	}
 	b.Bridge.Delete()

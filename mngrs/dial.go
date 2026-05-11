@@ -82,6 +82,7 @@ func (man *DialManager) manageOutboundCallLeg(outboundChannel *types.LineChannel
 func (man *DialManager) startOutboundCall(callType string) {
 	ctx := man.ManagerContext
 	cell := ctx.Cell
+	channel := ctx.Channel
 	model := cell.Model
 	flow := ctx.Flow
 	user := flow.User
@@ -94,10 +95,12 @@ func (man *DialManager) startOutboundCall(callType string) {
 	valid, err := api.VerifyCallerId(strconv.Itoa(user.Workspace.Id), callerId)
 	if err != nil {
 		helpers.Log(logrus.DebugLevel, "verify error: "+err.Error())
+		channel.SafeHangup()
 		return
 	}
 	if !valid {
 		helpers.Log(logrus.DebugLevel, "caller id was invalid. user provided: "+callerId)
+		channel.SafeHangup()
 		return
 	}
 
@@ -117,6 +120,10 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	if err != nil {
 		helpers.Log(logrus.DebugLevel, "error creating outbound channel: "+err.Error())
+		channel.SafeHangup()
+		if outboundChannel != nil {
+			outboundChannel.Hangup()
+		}
 		return
 	}
 
@@ -142,6 +149,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 	body, err := json.Marshal(params)
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		outboundChannel.Hangup()
 		return
 	}
 
@@ -151,6 +159,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		outboundChannel.Hangup()
 		return
 	}
 
@@ -160,6 +169,7 @@ func (man *DialManager) startOutboundCall(callType string) {
 
 	if err != nil {
 		helpers.Log(logrus.ErrorLevel, "error occured: "+err.Error())
+		outboundChannel.Hangup()
 		return
 	}
 	outChannel.Channel = outboundChannel
