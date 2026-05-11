@@ -242,16 +242,20 @@ func (man *BridgeManager) startOutboundCall(bridge *types.LineBridge, callType s
 	valid, err := api.VerifyCallerId(strconv.Itoa(user.Workspace.Id), callerId)
 	if err != nil {
 		helpers.Log(logrus.DebugLevel, "verify error: "+err.Error())
+
+		bridge.EndBridgeCall()
 		return
 	}
 	if !valid {
 		helpers.Log(logrus.DebugLevel, "caller id was invalid. user provided: "+callerId)
+		bridge.EndBridgeCall()
 		return
 	}
 
 	numberToCall, err := utils.DetermineNumberToCall(model.Data)
 	if err != nil {
 		helpers.Log(logrus.DebugLevel, "verify error: "+err.Error())
+		bridge.EndBridgeCall()
 		return
 	}
 	//key := src.New(ari.ChannelKey, rid.New(rid.Channel))
