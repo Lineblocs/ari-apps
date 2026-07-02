@@ -70,58 +70,125 @@ func createARIConnection(connectCtx context.Context) (ari.Client, error) {
 }
 
 func startProcessingWSEvents() {
-	helpers.Log(logrus.InfoLevel, "Connecting")
-	connectCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	cl, err := createARIConnection(connectCtx)
+	defer func() {
+		if r := recover(); r != nil {
+			helpers.Log(logrus.ErrorLevel, fmt.Sprintf("PANIC in startProcessingWSEvents recovered: %v. Restarting...", r))
+			time.Sleep(time.Second * 5)
+			startProcessingWSEvents()
+		}
+	}()
 
-	if err != nil {
-		fmt.Printf("could not connect to ARI. error: %s", err.Error())
-		panic(err.Error())
-		return
-	}
+	retryCount := 0
+	maxRetries := 10
+	backoffDuration := time.Second
+
+	for {
+		helpers.Log(logrus.InfoLevel, "Connecting to ARI (attempt %d)", retryCount+1)
+		connectCtx, cancel := context.WithCancel(context.Background())
+		cl, err := createARIConnection(connectCtx)
+
+		if err != nil {
+			retryCount++
+			helpers.Log(logrus.ErrorLevel, "could not connect to ARI. error: %s. Retrying in %v...", err.Error(), backoffDuration)
+			cancel()
+			if retryCount < maxRetries {
+				time.Sleep(backoffDuration)
+				if backoffDuration < time.Minute {
+					backoffDuration *= 2
+				}
+				continue
+			} else {
+				helpers.Log(logrus.ErrorLevel, "Max retries reached. Exiting.")
+				return
+			}
+		}
+
+	retryCount = 0
+	backoffDuration = time.Second
 
 	helpers.Log(logrus.InfoLevel, "Connected to ARI")
 
-	defer cl.Close()
+	defer func() {
+		helpers.Log(logrus.InfoLevel, "Closing ARI connection")
+		cl.Close()
+		cancel()
+	}()
 
 	helpers.Log(logrus.InfoLevel, "starting GRPC listener...")
 	go grpc.StartListener(cl)
-	// setup app
 
 	helpers.Log(logrus.InfoLevel, "Starting listener app")
-
 	helpers.Log(logrus.InfoLevel, "Listening for new calls")
 	sub := cl.Bus().Subscribe(nil, "StasisStart")
 
+	reconnectTicker := time.NewTicker(time.Second * 30)
+	defer reconnectTicker.Stop()
+
 	for {
 		if !cl.Connected() {
-			helpers.Log(logrus.ErrorLevel, "websocket was disconnected. reconnecting now.")
+			helpers.Log(logrus.ErrorLevel, "websocket was disconnected. Reconnecting...")
 			cl.Close()
-			startProcessingWSEvents()
-			return
+			cancel()
+			sub.Cancel()
+			break
 		}
 
 		select {
-			case e := <-sub.Events():
-				v := e.(*ari.StasisStart)
-				helpers.Log(logrus.InfoLevel, "Got stasis start"+" channel "+v.Channel.ID)
-				go startExecution(cl, v, cl.Channel().Get(v.Key(ari.ChannelKey, v.Channel.ID)))
-			case <-connectCtx.Done():
-				cl.Close()
-				return
+		case e := <-sub.Events():
+			if e == nil {
+				helpers.Log(logrus.WarnLevel, "Received nil event from subscription")
+				break
 			}
+			if ss, ok := e.(*ari.StasisStart); ok {
+				helpers.Log(logrus.InfoLevel, "Got stasis start for channel: %s", ss.Channel.ID)
+				go func(ssEvent *ari.StasisStart) {
+					defer func() {
+						if r := recover(); r != nil {
+							helpers.Log(logrus.ErrorLevel, fmt.Sprintf("PANIC in startExecution recovered: %v for channel %s", r, ssEvent.Channel.ID))
+						}
+					}()
+					startExecution(cl, ssEvent, cl.Channel().Get(ssEvent.Key(ari.ChannelKey, ssEvent.Channel.ID)))
+				}(ss)
+			} else {
+				helpers.Log(logrus.WarnLevel, "Unexpected event type received: %T", e)
+			}
+		case <-reconnectTicker.C:
+			if !cl.Connected() {
+				helpers.Log(logrus.WarnLevel, "Connection health check failed. Reconnecting...")
+				cl.Close()
+				cancel()
+				sub.Cancel()
+				break
+			}
+		case <-connectCtx.Done():
+			helpers.Log(logrus.InfoLevel, "Context cancelled. Closing connection.")
+			cl.Close()
+			sub.Cancel()
+			return
+		}
 	}
 }
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("FATAL PANIC in main: %v\n", r)
+			os.Exit(1)
+		}
+	}()
+
 	// OPTIONAL: setup logging
 	//native.Logger = log
 	// Init Logrus and configure channels
 	logDestination := utils.Config("LOG_DESTINATIONS")
 	helpers.InitLogrus(logDestination)
+	helpers.Log(logrus.InfoLevel, "Starting ARI application service")
 
-	startProcessingWSEvents()
+	for {
+		startProcessingWSEvents()
+		helpers.Log(logrus.InfoLevel, "Restarting main event processing loop...")
+		time.Sleep(time.Second * 5)
+	}
 }
 
 type bridgeManager struct {
@@ -135,6 +202,12 @@ func createCallDebit(user *types.User, call *types.Call, direction string) error
 	return nil
 }
 func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChannel, callChannel chan *types.Call) {
+	defer func() {
+		if r := recover(); r != nil {
+			helpers.Log(logrus.ErrorLevel, fmt.Sprintf("PANIC in attachChannelLifeCycleListeners recovered: %v", r))
+		}
+	}()
+
 	var call *types.Call
 	endSub := channel.Channel.Subscribe(ari.Events.StasisEnd)
 	defer endSub.Cancel()
@@ -145,7 +218,11 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 
 		select {
 		case <-endSub.Events():
-			helpers.Log(logrus.DebugLevel, "stasis end called..")
+			helpers.Log(logrus.DebugLevel, "stasis end called")
+			if call == nil {
+				helpers.Log(logrus.WarnLevel, "Call is nil when stasis end received")
+				break
+			}
 			call.Ended = time.Now()
 			params := types.StatusParams{
 				CallId: call.CallId,
@@ -153,28 +230,38 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 				Status: "ENDED"}
 			body, err := json.Marshal(params)
 			if err != nil {
-				helpers.Log(logrus.DebugLevel, "JSON error: "+err.Error())
+				helpers.Log(logrus.ErrorLevel, "JSON marshalling error: %s for call %d", err.Error(), call.CallId)
 				continue
 			}
 
 			_, err = api.SendHttpRequest("/call/updateCall", body)
 			if err != nil {
-				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
+				helpers.Log(logrus.ErrorLevel, "Failed to update call status: %s for call %d", err.Error(), call.CallId)
 				continue
 			}
 			err = createCallDebit(flow.User, call, "INBOUND")
 			if err != nil {
-				helpers.Log(logrus.DebugLevel, "HTTP error: "+err.Error())
+				helpers.Log(logrus.ErrorLevel, "Failed to create call debit: %s for call %d", err.Error(), call.CallId)
 				continue
 			}
+			helpers.Log(logrus.InfoLevel, "Call %d ended successfully", call.CallId)
 
 		case call = <-callChannel:
-			helpers.Log(logrus.DebugLevel, "call is setup")
-			helpers.Log(logrus.DebugLevel, "id is "+strconv.Itoa(call.CallId))
+			if call == nil {
+				helpers.Log(logrus.WarnLevel, "Received nil call from channel")
+				break
+			}
+			helpers.Log(logrus.DebugLevel, "call is setup with ID: %d", call.CallId)
 		}
 	}
 }
 func attachDTMFListeners(channel *types.LineChannel) {
+	defer func() {
+		if r := recover(); r != nil {
+			helpers.Log(logrus.ErrorLevel, fmt.Sprintf("PANIC in attachDTMFListeners recovered: %v", r))
+		}
+	}()
+
 	dtmfSub := channel.Channel.Subscribe(ari.Events.ChannelDtmfReceived)
 	defer dtmfSub.Cancel()
 
@@ -182,20 +269,34 @@ func attachDTMFListeners(channel *types.LineChannel) {
 
 		select {
 		case <-dtmfSub.Events():
-			helpers.Log(logrus.DebugLevel, "received DTMF!")
+			helpers.Log(logrus.DebugLevel, "Received DTMF on channel %s", channel.Channel.ID())
 		}
 	}
 }
 
 func processIncomingCall(cl ari.Client, flow *types.Flow, lineChannel *types.LineChannel, exten string, callerId string, sipCallId string) {
+	defer func() {
+		if r := recover(); r != nil {
+			helpers.Log(logrus.ErrorLevel, fmt.Sprintf("PANIC in processIncomingCall recovered: %v for exten %s caller %s", r, exten, callerId))
+			if lineChannel != nil && lineChannel.Channel != nil {
+				defer func() {
+					if rr := recover(); rr != nil {
+						helpers.Log(logrus.ErrorLevel, fmt.Sprintf("Error hangup channel: %v", rr))
+					}
+				}()
+				lineChannel.SafeHangup()
+			}
+		}
+	}()
+
 	go attachDTMFListeners(lineChannel)
 	callChannel := make(chan *types.Call)
 	go attachChannelLifeCycleListeners(flow, lineChannel, callChannel)
 
-	helpers.Log(logrus.DebugLevel, "calling API to create call...")
-	helpers.Log(logrus.DebugLevel, "exten is: "+exten)
-	helpers.Log(logrus.DebugLevel, "caller ID is: "+callerId)
-	helpers.Log(logrus.DebugLevel, "SIP call id: "+sipCallId)
+	helpers.Log(logrus.DebugLevel, "Calling API to create call...")
+	helpers.Log(logrus.DebugLevel, "exten is: %s", exten)
+	helpers.Log(logrus.DebugLevel, "caller ID is: %s", callerId)
+	helpers.Log(logrus.DebugLevel, "SIP call id: %s", sipCallId)
 	params := types.CallParams{
 		From:        callerId,
 		To:          exten,
@@ -238,17 +339,37 @@ func processIncomingCall(cl ari.Client, flow *types.Flow, lineChannel *types.Lin
 }
 
 func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle) {
-	//ctx, cancel := context.WithCancel(context.Background())
-	//defer cancel()
-	helpers.Log(logrus.InfoLevel, "running app"+" channel "+h.Key().ID)
+	defer func() {
+		if r := recover(); r != nil {
+			helpers.Log(logrus.ErrorLevel, fmt.Sprintf("PANIC in startExecution recovered for channel %s: %v", h.Key().ID, r))
+			if h != nil {
+				defer func() {
+					if rr := recover(); rr != nil {
+						helpers.Log(logrus.ErrorLevel, fmt.Sprintf("Error hangup channel: %v", rr))
+					}
+				}()
+				h.Hangup()
+			}
+		}
+	}()
+
+	helpers.Log(logrus.InfoLevel, "running app for channel %s", h.Key().ID)
+
+	if len(event.Args) < 2 {
+		helpers.Log(logrus.ErrorLevel, "Invalid StasisStart event: insufficient arguments for channel %s", h.Key().ID)
+		if h != nil {
+			h.Hangup()
+		}
+		return
+	}
 
 	action := event.Args[0]
 	exten := event.Args[1]
 	vals := make(map[string]string)
 	vals["number"] = exten
 
-	helpers.Log(logrus.DebugLevel, "received action: "+action)
-	helpers.Log(logrus.DebugLevel, "EXTEN: "+exten)
+	helpers.Log(logrus.DebugLevel, "received action: %s for channel %s", action, h.Key().ID)
+	helpers.Log(logrus.DebugLevel, "EXTEN: %s", exten)
 
 	switch action {
 	case "h":
