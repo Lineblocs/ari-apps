@@ -20,15 +20,14 @@ import (
 	"lineblocs.com/processor/grpc"
 	"lineblocs.com/processor/logger"
 	"lineblocs.com/processor/mngrs"
+	"lineblocs.com/processor/resources"
 	"lineblocs.com/processor/types"
 	"lineblocs.com/processor/utils"
-	"lineblocs.com/processor/resources"
 )
 
 var ariApp = "lineblocs"
 
 var bridge *ari.BridgeHandle
-
 
 type APIResponse struct {
 	Headers http.Header
@@ -83,13 +82,13 @@ func startProcessingWSEvents() {
 	backoffDuration := time.Second
 
 	for {
-		helpers.Log(logrus.InfoLevel, "Connecting to ARI (attempt %d)", retryCount+1)
+		helpers.Log(logrus.InfoLevel, fmt.Sprintf("Connecting to ARI (attempt %d)", retryCount+1))
 		connectCtx, cancel := context.WithCancel(context.Background())
 		cl, err := createARIConnection(connectCtx)
 
 		if err != nil {
 			retryCount++
-			helpers.Log(logrus.ErrorLevel, "could not connect to ARI. error: %s. Retrying in %v...", err.Error(), backoffDuration)
+			helpers.Log(logrus.ErrorLevel, fmt.Sprintf("could not connect to ARI. error: %s. Retrying in %v...", err.Error(), backoffDuration))
 			cancel()
 			if retryCount < maxRetries {
 				time.Sleep(backoffDuration)
@@ -103,68 +102,69 @@ func startProcessingWSEvents() {
 			}
 		}
 
-	retryCount = 0
-	backoffDuration = time.Second
+		retryCount = 0
+		backoffDuration = time.Second
 
-	helpers.Log(logrus.InfoLevel, "Connected to ARI")
+		helpers.Log(logrus.InfoLevel, "Connected to ARI")
 
-	defer func() {
-		helpers.Log(logrus.InfoLevel, "Closing ARI connection")
-		cl.Close()
-		cancel()
-	}()
-
-	helpers.Log(logrus.InfoLevel, "starting GRPC listener...")
-	go grpc.StartListener(cl)
-
-	helpers.Log(logrus.InfoLevel, "Starting listener app")
-	helpers.Log(logrus.InfoLevel, "Listening for new calls")
-	sub := cl.Bus().Subscribe(nil, "StasisStart")
-
-	reconnectTicker := time.NewTicker(time.Second * 30)
-	defer reconnectTicker.Stop()
-
-	for {
-		if !cl.Connected() {
-			helpers.Log(logrus.ErrorLevel, "websocket was disconnected. Reconnecting...")
+		defer func() {
+			helpers.Log(logrus.InfoLevel, "Closing ARI connection")
 			cl.Close()
 			cancel()
-			sub.Cancel()
-			break
-		}
+		}()
 
-		select {
-		case e := <-sub.Events():
-			if e == nil {
-				helpers.Log(logrus.WarnLevel, "Received nil event from subscription")
-				break
-			}
-			if ss, ok := e.(*ari.StasisStart); ok {
-				helpers.Log(logrus.InfoLevel, "Got stasis start for channel: %s", ss.Channel.ID)
-				go func(ssEvent *ari.StasisStart) {
-					defer func() {
-						if r := recover(); r != nil {
-							helpers.Log(logrus.ErrorLevel, fmt.Sprintf("PANIC in startExecution recovered: %v for channel %s", r, ssEvent.Channel.ID))
-						}
-					}()
-					startExecution(cl, ssEvent, cl.Channel().Get(ssEvent.Key(ari.ChannelKey, ssEvent.Channel.ID)))
-				}(ss)
-			} else {
-				helpers.Log(logrus.WarnLevel, "Unexpected event type received: %T", e)
-			}
-		case <-reconnectTicker.C:
+		helpers.Log(logrus.InfoLevel, "starting GRPC listener...")
+		go grpc.StartListener(cl)
+
+		helpers.Log(logrus.InfoLevel, "Starting listener app")
+		helpers.Log(logrus.InfoLevel, "Listening for new calls")
+		sub := cl.Bus().Subscribe(nil, "StasisStart")
+
+		reconnectTicker := time.NewTicker(time.Second * 30)
+		defer reconnectTicker.Stop()
+
+		for {
 			if !cl.Connected() {
-				helpers.Log(logrus.WarnLevel, "Connection health check failed. Reconnecting...")
+				helpers.Log(logrus.ErrorLevel, "websocket was disconnected. Reconnecting...")
 				cl.Close()
 				cancel()
 				sub.Cancel()
 				break
 			}
-		case <-connectCtx.Done():
-			helpers.Log(logrus.InfoLevel, "Context cancelled. Closing connection.")
-			cl.Close()
-			sub.Cancel()
-			return
+
+			select {
+			case e := <-sub.Events():
+				if e == nil {
+					helpers.Log(logrus.WarnLevel, "Received nil event from subscription")
+					break
+				}
+				if ss, ok := e.(*ari.StasisStart); ok {
+				helpers.Log(logrus.InfoLevel, fmt.Sprintf("Got stasis start for channel: %s", ss.Channel.ID))
+					go func(ssEvent *ari.StasisStart) {
+						defer func() {
+							if r := recover(); r != nil {
+								helpers.Log(logrus.ErrorLevel, fmt.Sprintf("PANIC in startExecution recovered: %v for channel %s", r, ssEvent.Channel.ID))
+							}
+						}()
+						startExecution(cl, ssEvent, cl.Channel().Get(ssEvent.Key(ari.ChannelKey, ssEvent.Channel.ID)))
+					}(ss)
+				} else {
+					helpers.Log(logrus.WarnLevel, fmt.Sprintf("Unexpected event type received: %T", e))
+				}
+			case <-reconnectTicker.C:
+				if !cl.Connected() {
+					helpers.Log(logrus.WarnLevel, "Connection health check failed. Reconnecting...")
+					cl.Close()
+					cancel()
+					sub.Cancel()
+					break
+				}
+			case <-connectCtx.Done():
+				helpers.Log(logrus.InfoLevel, "Context cancelled. Closing connection.")
+				cl.Close()
+				sub.Cancel()
+				return
+			}
 		}
 	}
 }
@@ -198,9 +198,11 @@ type bridgeManager struct {
 func createCall() (types.Call, error) {
 	return types.Call{}, nil
 }
+
 func createCallDebit(user *types.User, call *types.Call, direction string) error {
 	return nil
 }
+
 func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChannel, callChannel chan *types.Call) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -215,7 +217,6 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 	call = nil
 
 	for {
-
 		select {
 		case <-endSub.Events():
 			helpers.Log(logrus.DebugLevel, "stasis end called")
@@ -230,31 +231,32 @@ func attachChannelLifeCycleListeners(flow *types.Flow, channel *types.LineChanne
 				Status: "ENDED"}
 			body, err := json.Marshal(params)
 			if err != nil {
-				helpers.Log(logrus.ErrorLevel, "JSON marshalling error: %s for call %d", err.Error(), call.CallId)
+				helpers.Log(logrus.ErrorLevel, fmt.Sprintf("JSON marshalling error: %s for call %d", err.Error(), call.CallId))
 				continue
 			}
 
 			_, err = api.SendHttpRequest("/call/updateCall", body)
 			if err != nil {
-				helpers.Log(logrus.ErrorLevel, "Failed to update call status: %s for call %d", err.Error(), call.CallId)
+				helpers.Log(logrus.ErrorLevel, fmt.Sprintf("Failed to update call status: %s for call %d", err.Error(), call.CallId))
 				continue
 			}
 			err = createCallDebit(flow.User, call, "INBOUND")
 			if err != nil {
-				helpers.Log(logrus.ErrorLevel, "Failed to create call debit: %s for call %d", err.Error(), call.CallId)
+				helpers.Log(logrus.ErrorLevel, fmt.Sprintf("Failed to create call debit: %s for call %d", err.Error(), call.CallId))
 				continue
 			}
-			helpers.Log(logrus.InfoLevel, "Call %d ended successfully", call.CallId)
+			helpers.Log(logrus.InfoLevel, fmt.Sprintf("Call %d ended successfully", call.CallId))
 
 		case call = <-callChannel:
 			if call == nil {
 				helpers.Log(logrus.WarnLevel, "Received nil call from channel")
 				break
 			}
-			helpers.Log(logrus.DebugLevel, "call is setup with ID: %d", call.CallId)
+			helpers.Log(logrus.DebugLevel, fmt.Sprintf("call is setup with ID: %d", call.CallId))
 		}
 	}
 }
+
 func attachDTMFListeners(channel *types.LineChannel) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -266,10 +268,9 @@ func attachDTMFListeners(channel *types.LineChannel) {
 	defer dtmfSub.Cancel()
 
 	for {
-
 		select {
 		case <-dtmfSub.Events():
-			helpers.Log(logrus.DebugLevel, "Received DTMF on channel %s", channel.Channel.ID())
+			helpers.Log(logrus.DebugLevel, fmt.Sprintf("Received DTMF on channel %s", channel.Channel.ID()))
 		}
 	}
 }
@@ -294,9 +295,9 @@ func processIncomingCall(cl ari.Client, flow *types.Flow, lineChannel *types.Lin
 	go attachChannelLifeCycleListeners(flow, lineChannel, callChannel)
 
 	helpers.Log(logrus.DebugLevel, "Calling API to create call...")
-	helpers.Log(logrus.DebugLevel, "exten is: %s", exten)
-	helpers.Log(logrus.DebugLevel, "caller ID is: %s", callerId)
-	helpers.Log(logrus.DebugLevel, "SIP call id: %s", sipCallId)
+		helpers.Log(logrus.DebugLevel, fmt.Sprintf("exten is: %s", exten))
+		helpers.Log(logrus.DebugLevel, fmt.Sprintf("caller ID is: %s", callerId))
+		helpers.Log(logrus.DebugLevel, fmt.Sprintf("SIP call id: %s", sipCallId))
 	params := types.CallParams{
 		From:        callerId,
 		To:          exten,
@@ -305,7 +306,7 @@ func processIncomingCall(cl ari.Client, flow *types.Flow, lineChannel *types.Lin
 		UserId:      flow.User.Id,
 		WorkspaceId: flow.User.Workspace.Id,
 		ChannelId:   lineChannel.Channel.ID(),
-		SIPCallId: sipCallId,
+		SIPCallId:   sipCallId,
 	}
 	body, err := json.Marshal(params)
 	if err != nil {
@@ -353,10 +354,10 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 		}
 	}()
 
-	helpers.Log(logrus.InfoLevel, "running app for channel %s", h.Key().ID)
+helpers.Log(logrus.InfoLevel, fmt.Sprintf("running app for channel %s", h.Key().ID))
 
 	if len(event.Args) < 2 {
-		helpers.Log(logrus.ErrorLevel, "Invalid StasisStart event: insufficient arguments for channel %s", h.Key().ID)
+		helpers.Log(logrus.ErrorLevel, fmt.Sprintf("Invalid StasisStart event: insufficient arguments for channel %s", h.Key().ID))
 		if h != nil {
 			h.Hangup()
 		}
@@ -368,8 +369,8 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 	vals := make(map[string]string)
 	vals["number"] = exten
 
-	helpers.Log(logrus.DebugLevel, "received action: %s for channel %s", action, h.Key().ID)
-	helpers.Log(logrus.DebugLevel, "EXTEN: %s", exten)
+helpers.Log(logrus.DebugLevel, fmt.Sprintf("received action: %s for channel %s", action, h.Key().ID))
+		helpers.Log(logrus.DebugLevel, fmt.Sprintf("EXTEN: %s", exten))
 
 	switch action {
 	case "h":
@@ -437,13 +438,13 @@ func startExecution(cl ari.Client, event *ari.StasisStart, h *ari.ChannelHandle)
 				return
 			}
 		default:
-			// The 'default' case handles the original 'else' block. 
+			// The 'default' case handles the original 'else' block.
 			// It runs if the 'case' condition above is FALSE, meaning:
 			// (data.FlowJson != "" || data.CreationIntent != "CREATED_WITH_DID_PURCHASE")
-			
-			// We only need data.FlowJson != "" for the Unmarshal, but the logic 
+
+			// We only need data.FlowJson != "" for the Unmarshal, but the logic
 			// must be the inverse of the 'case' above to be a true replacement for the 'else'.
-			
+
 			err = json.Unmarshal([]byte(data.FlowJson), &flowJson)
 			if err != nil {
 				helpers.Log(logrus.ErrorLevel, "startExecution err "+err.Error())
