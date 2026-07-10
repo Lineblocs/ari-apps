@@ -1,0 +1,101 @@
+version: "3.6"
+x-logging: &default-logging
+  options:
+    max-size: "100m"
+    max-file: "5"
+  driver: json-file
+services:
+  ari_apps:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: lineblocs-ari-apps
+    logging: *default-logging
+    container_name: lineblocs-ari-apps
+    # Please choose, use block of "volumes" or "develop"
+    # volumes:
+    #   - ..:/app
+    #   - ../netdiscover:/bin/netdiscover
+    #   - ../go.mod:/go.mod 
+    #   - ../go.sum:/go.sum
+    develop:
+      watch:
+        - action: sync
+          path: ..
+          target: /app
+        - action: sync+restart
+          path: ./entrypoint.sh
+          target: /app/dev/entrypoint.sh
+        - action: sync+restart
+          path: ../netdiscover
+          target: /bin/netdiscover
+        - action: sync+restart
+          path: ../go.mod
+          target: /go.mod
+        - action: sync+restart
+          path: ../go.sum
+          target: /go.sum
+        - action: rebuild
+          path: ./Dockerfile
+        - action: rebuild
+          path: ./docker-compose.yaml
+    restart: unless-stopped
+    # environment:
+    #   - DEPLOYMENT_DOMAIN=${DEPLOYMENT_DOMAIN}
+    #   - ARI_HOST=${ARI_HOST}
+    #   - ARI_PORT=${ARI_PORT}
+    #   - ARI_USERNAME=${ARI_USERNAME}
+    #   - ARI_PASSWORD=${ARI_PASSWORD}
+    #   - ARI_USE_PROXY=${ARI_USE_PROXY}
+    #   - LINEBLOCS_KEY=${LINEBLOCS_KEY}
+    #   - NATSGW_URL=
+    #   - PROXY_HOST=
+    #   - USE_DOTENV=
+    entrypoint:
+      sh -c "
+        /bin/bash ;
+        /app/dev/entrypoint.sh ;
+      "
+    network_mode: "host"
+
+  asterisk:
+    build:
+      context: ../../asterisk/
+      dockerfile: Dockerfile
+    image: lineblocs-asterisk
+    volumes:
+      - ../../asterisk/configs:/etc/asterisk/
+    logging: *default-logging
+    container_name: lineblocs-asterisk
+    restart: unless-stopped
+    environment:
+      - AMI_USER=${AMI_USER}
+      - AMI_PASS=${AMI_PASS}
+      - AMI_PORT=${AMI_PORT}
+      - AMI_HOST=${AMI_HOST}
+      - ARI_USERNAME=${ARI_USERNAME}
+      - ARI_PASSWORD=${ARI_PASSWORD}
+      - LINEBLOCS_KEY=${LINEBLOCS_KEY}
+    profiles:
+      - asterisk-local
+    network_mode: "host"
+
+  asterisk-cloud:
+    image: lineblocs/asterisk:${VERSION}
+    # to enable costum config. Please uncomment volumes and that value. Also make sure, you have asterisk project
+    # volumes:
+    #   - ../../asterisk/configs:/etc/asterisk/
+    logging: *default-logging
+    container_name: lineblocs-asterisk-cloud
+    restart: unless-stopped
+    environment:
+      - AMI_USER=${AMI_USER}
+      - AMI_PASS=${AMI_PASS}
+      - AMI_PORT=${AMI_PORT}
+      - AMI_HOST=${AMI_HOST}
+      - ARI_USERNAME=${ARI_USERNAME}
+      - ARI_PASSWORD=${ARI_PASSWORD}
+      - LINEBLOCS_KEY=${LINEBLOCS_KEY}
+    profiles:
+      - asterisk-cloud
+    network_mode: "host"
